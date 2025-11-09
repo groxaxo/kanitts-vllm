@@ -50,7 +50,7 @@ class OpenAISpeechRequest(BaseModel):
     """OpenAI-compatible speech request model"""
     input: str = Field(..., description="Text to convert to speech")
     model: Literal["tts-1", "tts-1-hd", "gpt-4o-mini-tts"] = Field(default="tts-1", description="TTS model to use")
-    voice: Literal["andrew", "katie"] = Field(default="andrew", description="Voice to use (use 'random' to omit voice prefix)")
+    voice: str = Field(default="andrew", description="Voice to use (available voices depend on the model configured in config.py; use 'random' to omit voice prefix)")
     response_format: Literal["wav", "pcm"] = Field(default="wav", description="Audio format: wav or pcm")
     stream_format: Optional[Literal["sse", "audio"]] = Field(default=None, description="Use 'sse' for Server-Sent Events streaming")
     # Long-form generation parameters
