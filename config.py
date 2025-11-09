@@ -37,5 +37,9 @@ LONG_FORM_SILENCE_DURATION = 0.2    # Silence between chunks in seconds
 
 
 # Model paths
+# Change MODEL_NAME to use a different language:
+# - English: "nineninesix/kani-tts-400m-en" (voices: andrew, katie)
+# - Spanish: "nineninesix/kani-tts-400m-es" (voices: nova, ballad, ash)
+# See https://huggingface.co/nineninesix for more language models
 MODEL_NAME = "nineninesix/kani-tts-400m-en"
 CODEC_MODEL_NAME = "nvidia/nemo-nano-codec-22khz-0.6kbps-12.5fps"

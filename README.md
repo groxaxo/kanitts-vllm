@@ -133,6 +133,51 @@ curl -X POST http://localhost:8000/v1/audio/speech \
 
 Check out [https://github.com/nineninesix-ai/open-audio](https://github.com/nineninesix-ai/open-audio) for NextJS implementation
 
+## Language Support
+
+KaniTTS-vLLM supports multiple languages through different models. To use a different language, configure the model in `config.py`.
+
+### Using Spanish
+
+To configure KaniTTS-vLLM for Spanish:
+
+1. **Edit `config.py`** and change the `MODEL_NAME`:
+   ```python
+   MODEL_NAME = "nineninesix/kani-tts-400m-es"
+   ```
+
+2. **Restart the server** to load the Spanish model:
+   ```bash
+   uv run python server.py
+   ```
+   The Spanish model will be automatically downloaded on first run.
+
+3. **Use Spanish voices** in your requests. Available Spanish voices include:
+   - `nova`
+   - `ballad`
+   - `ash`
+
+4. **Example Spanish request**:
+   ```bash
+   curl -X POST http://localhost:8000/v1/audio/speech \
+     -H "Content-Type: application/json" \
+     -d '{
+       "input": "Hola, esto es una prueba del sistema de texto a voz para español.",
+       "voice": "nova",
+       "response_format": "wav"
+     }' \
+     --output speech_es.wav
+   ```
+
+### Other Languages
+
+Other language models are available at [https://huggingface.co/nineninesix](https://huggingface.co/nineninesix). To use them:
+
+1. Find the model for your desired language on HuggingFace
+2. Update `MODEL_NAME` in `config.py` to the model path
+3. Refer to the model's card for available voices
+4. Restart the server and use the appropriate voices for that language
+
 ## API Reference
 
 ### POST `/v1/audio/speech`
@@ -155,12 +200,18 @@ OpenAI-compatible endpoint for text-to-speech generation.
 ```
 
 #### Available Voices
-Available voices depend on the model. See the corresponding model's card on [HuggingFace](https://huggingface.co/nineninesix) for the complete list of supported voices.
+Available voices depend on the model configured in `config.py`. See the corresponding model's card on [HuggingFace](https://huggingface.co/nineninesix) for the complete list of supported voices.
 
-Example voices for English:
+**English model** (`nineninesix/kani-tts-400m-en`):
 - `andrew` - Male voice
 - `katie` - Female voice
-- *(More voices available depending on model)*
+
+**Spanish model** (`nineninesix/kani-tts-400m-es`):
+- `nova`
+- `ballad`
+- `ash`
+
+For other language models, refer to the model's HuggingFace card for available voices.
 
 #### Response Formats
 
