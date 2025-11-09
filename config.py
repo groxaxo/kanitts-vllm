@@ -43,3 +43,10 @@ LONG_FORM_SILENCE_DURATION = 0.2    # Silence between chunks in seconds
 # See https://huggingface.co/nineninesix for more language models
 MODEL_NAME = "nineninesix/kani-tts-400m-en"
 CODEC_MODEL_NAME = "nvidia/nemo-nano-codec-22khz-0.6kbps-12.5fps"
+
+# BitsAndBytes Quantization Configuration
+# Enable BnB quantization to reduce VRAM consumption
+# Options: None (disabled), "bitsandbytes" (4-bit quantization)
+# 4-bit quantization can reduce VRAM usage by ~4x with minimal quality loss
+USE_BNB_QUANTIZATION = True  # Set to False to disable quantization
+BNB_QUANTIZATION = "bitsandbytes" if USE_BNB_QUANTIZATION else None

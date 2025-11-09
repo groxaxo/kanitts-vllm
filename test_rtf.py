@@ -1,16 +1,17 @@
-"""Quick test to verify RTF output"""
+"""Quick test to verify RTF output with BnB quantization"""
 
 import asyncio
 from generation.vllm_generator import VLLMTTSGenerator
 from audio import LLMAudioPlayer, StreamingAudioWriter
-from config import CHUNK_SIZE, LOOKBACK_FRAMES
+from config import CHUNK_SIZE, LOOKBACK_FRAMES, BNB_QUANTIZATION
 
 async def main():
-    print("Initializing VLLM generator...")
+    print("Initializing VLLM generator with BnB quantization...")
     generator = VLLMTTSGenerator(
         tensor_parallel_size=1,
         gpu_memory_utilization=0.9,
-        max_model_len=2048
+        max_model_len=2048,
+        quantization=BNB_QUANTIZATION
     )
 
     # Initialize engine

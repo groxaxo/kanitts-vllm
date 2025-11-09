@@ -7,6 +7,7 @@ A high-performance Text-to-Speech (TTS) system powered by vLLM, providing an Ope
 ## Features
 
 - **Ultra-Fast Inference**: 10x faster than standard HuggingFace transformers using vLLM's optimized engine
+- **Low VRAM Usage**: BitsAndBytes 4-bit quantization reduces VRAM consumption by ~4x (runs on 4GB+ GPUs)
 - **OpenAI-Compatible API**: Drop-in replacement for OpenAI's `/v1/audio/speech` endpoint
 - **Real-Time Streaming**: Server-Sent Events (SSE) support for progressive audio delivery
 - **Long-Form Generation**: Automatic text chunking for generating speech from lengthy inputs
@@ -38,7 +39,7 @@ The system uses:
 - Linux
 - Python 3.10 -- 3.12
 - NVIDIA GPU with CUDA 12.8+
-- 12GB+ VRAM recommended
+- 4GB+ VRAM with BnB quantization (12GB+ without quantization)
 
 ### Install Dependencies
 
@@ -76,6 +77,11 @@ uv pip install vllm --torch-backend=auto
 6. (Optional) Check if `transformers==4.57.1` and if not force reinstall to 4.57.1 (required for model compatibility)
 ```bash
 uv pip install "transformers==4.57.1"
+```
+
+7. Install BitsAndBytes for quantization (reduces VRAM consumption by ~4x)
+```bash
+uv pip install "bitsandbytes>=0.46.1"
 ```
 
 Here is the [vLLM documentation](https://docs.vllm.ai/en/stable/getting_started/installation/gpu.html) for custom installation
@@ -286,6 +292,10 @@ LONG_FORM_SILENCE_DURATION = 0.2       # Inter-chunk silence
 # Models
 MODEL_NAME = "nineninesix/kani-tts-400m"
 CODEC_MODEL_NAME = "nvidia/nemo-nano-codec-22khz-0.6kbps-12.5fps"
+
+# BitsAndBytes Quantization (reduces VRAM by ~4x)
+USE_BNB_QUANTIZATION = True            # Enable/disable BnB quantization
+BNB_QUANTIZATION = "bitsandbytes"      # 4-bit quantization method
 ```
 
 ## Performance
@@ -316,17 +326,28 @@ Expected performance for RTX 5090:
 
 ### Optimization Tips
 
-1. **GPU Memory**: Adjust `gpu_memory_utilization` in [server.py](server.py):
+1. **BitsAndBytes Quantization** (VRAM Reduction): Enable 4-bit quantization in [config.py](config.py):
    ```python
-   gpu_memory_utilization=0.9  # Reduce if OOM occurs
+   USE_BNB_QUANTIZATION = True  # Reduces VRAM by ~4x (e.g., 16GB → 4GB)
+   ```
+   This allows running on lower-end GPUs (e.g., RTX 3060 with 8GB VRAM) with minimal quality impact.
+   
+   To disable quantization:
+   ```python
+   USE_BNB_QUANTIZATION = False  # Use full precision (requires more VRAM)
    ```
 
-2. **Multi-GPU**: Enable tensor parallelism:
+2. **GPU Memory**: Adjust `gpu_memory_utilization` in [server.py](server.py):
+   ```python
+   gpu_memory_utilization=0.5  # Lower value (0.3-0.5) with BnB, higher (0.7-0.9) without
+   ```
+
+3. **Multi-GPU**: Enable tensor parallelism:
    ```python
    tensor_parallel_size=2  # For 2 GPUs
    ```
 
-3. **Batch Processing**: Increase `max_num_seqs` for concurrent requests:
+4. **Batch Processing**: Increase `max_num_seqs` for concurrent requests:
    ```python
    max_num_seqs=4  # Process 4 requests simultaneously
    ```
