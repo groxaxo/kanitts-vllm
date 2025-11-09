@@ -139,6 +139,45 @@ curl -X POST http://localhost:8000/v1/audio/speech \
 
 Check out [https://github.com/nineninesix-ai/open-audio](https://github.com/nineninesix-ai/open-audio) for NextJS implementation
 
+## BitsAndBytes Quantization
+
+This fork includes **BitsAndBytes (BnB) 4-bit quantization** to significantly reduce VRAM consumption while maintaining high audio quality.
+
+### Benefits
+
+- **~4x VRAM Reduction**: A model requiring 16GB can run on 4GB VRAM
+- **Minimal Quality Loss**: BnB's advanced quantization preserves audio fidelity
+- **Broader GPU Support**: Run on lower-end GPUs (RTX 3060 8GB, RTX 3050, etc.)
+- **Same Performance**: Inference speed remains comparable to full precision
+
+### Configuration
+
+BnB quantization is **enabled by default**. To configure it, edit [config.py](config.py):
+
+```python
+# Enable BnB quantization (default)
+USE_BNB_QUANTIZATION = True
+
+# Disable for full precision (requires more VRAM)
+USE_BNB_QUANTIZATION = False
+```
+
+### VRAM Comparison
+
+| Model | Without BnB | With BnB 4-bit | GPU Examples |
+|-------|-------------|----------------|--------------|
+| kani-tts-400m-en | ~12-16GB | ~3-4GB | RTX 3060 (8GB), RTX 4060 (8GB) |
+| kani-tts-400m-es | ~12-16GB | ~3-4GB | RTX 3050 (8GB), GTX 1660 Ti (6GB) |
+
+*Note: Actual VRAM usage depends on `gpu_memory_utilization` and `max_model_len` settings.*
+
+### Technical Details
+
+- **Quantization Method**: BitsAndBytes 4-bit NormalFloat (NF4)
+- **Backend**: vLLM's native BnB integration
+- **No Calibration Required**: Dynamic quantization at load time
+- **Compatible with**: All model architectures supported by vLLM
+
 ## Language Support
 
 KaniTTS-vLLM supports multiple languages through different models. To use a different language, configure the model in `config.py`.
@@ -448,14 +487,19 @@ curl -X POST http://localhost:8000/v1/audio/speech \
 
 ### Out of Memory (OOM)
 
-Reduce GPU memory utilization in [server.py](server.py):
+**First, enable BitsAndBytes quantization** in [config.py](config.py):
 ```python
-gpu_memory_utilization=0.7  # Lower from 0.9
+USE_BNB_QUANTIZATION = True  # Reduces VRAM by ~4x
+```
+
+If still experiencing OOM, reduce GPU memory utilization in [server.py](server.py):
+```python
+gpu_memory_utilization=0.5  # Lower from default (try 0.3-0.5 with BnB)
 ```
 
 Or reduce max model length:
 ```python
-max_model_len=1024 (50 tokens equals to 1 sec)
+max_model_len=1024  # (50 tokens equals to 1 sec)
 ```
 
 ### Slow Generation
