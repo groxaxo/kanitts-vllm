@@ -10,20 +10,29 @@ from transformers import AutoTokenizer
 
 from config import (
     MODEL_NAME, START_OF_HUMAN, END_OF_TEXT, END_OF_HUMAN, END_OF_AI,
-    TEMPERATURE, TOP_P, REPETITION_PENALTY, MAX_TOKENS, SAMPLE_RATE
+    TEMPERATURE, TOP_P, REPETITION_PENALTY, MAX_TOKENS, SAMPLE_RATE,
+    BNB_QUANTIZATION
 )
 
 
 class VLLMTTSGenerator:
-    def __init__(self, tensor_parallel_size=1, gpu_memory_utilization=0.9, max_model_len=2048):
+    def __init__(self, tensor_parallel_size=1, gpu_memory_utilization=0.9, max_model_len=2048, quantization=None):
         """Initialize VLLM-based TTS generator with async streaming support
 
         Args:
             tensor_parallel_size: Number of GPUs to use for tensor parallelism
             gpu_memory_utilization: Fraction of GPU memory to use (0.0 to 1.0)
             max_model_len: Maximum sequence length
+            quantization: Quantization method (e.g., "bitsandbytes" for 4-bit quantization)
         """
         print(f"Loading VLLM AsyncLLMEngine model: {MODEL_NAME}")
+        
+        # Use BnB quantization from config if not explicitly provided
+        if quantization is None:
+            quantization = BNB_QUANTIZATION
+        
+        if quantization:
+            print(f"🔧 Using {quantization} quantization to reduce VRAM consumption")
 
         # Configure engine arguments
         engine_args = AsyncEngineArgs(
@@ -34,6 +43,7 @@ class VLLMTTSGenerator:
             enforce_eager=False,  # Allow CUDA graphs (reduces kernel launch overhead)
             max_num_seqs=1,  # Single sequence for TTS - enables better CUDA graph optimization
             dtype="bfloat16",  # BF16 for faster inference on RTX 5090
+            quantization=quantization,  # BitsAndBytes quantization for reduced VRAM
         )
 
         # Create async engine

@@ -13,7 +13,7 @@ import json
 
 from audio import LLMAudioPlayer, StreamingAudioWriter
 from generation.vllm_generator import VLLMTTSGenerator
-from config import CHUNK_SIZE, LOOKBACK_FRAMES, TEMPERATURE, TOP_P, MAX_TOKENS, LONG_FORM_THRESHOLD_SECONDS, LONG_FORM_SILENCE_DURATION, LONG_FORM_CHUNK_DURATION
+from config import CHUNK_SIZE, LOOKBACK_FRAMES, TEMPERATURE, TOP_P, MAX_TOKENS, LONG_FORM_THRESHOLD_SECONDS, LONG_FORM_SILENCE_DURATION, LONG_FORM_CHUNK_DURATION, BNB_QUANTIZATION
 
 from nemo.utils.nemo_logging import Logger
 
@@ -65,11 +65,12 @@ async def startup_event():
     global generator, player
     print("🚀 Initializing VLLM TTS models...")
 
-    # Use VLLM for faster inference
+    # Use VLLM for faster inference with BnB quantization for reduced VRAM
     generator = VLLMTTSGenerator(
         tensor_parallel_size=1,        # Increase for multi-GPU
-        gpu_memory_utilization=0.5,    # Increased from 0.5 to maximize KV cache (RTX 5090: 32GB)
-        max_model_len=1024             # Maximum sequence length
+        gpu_memory_utilization=0.5,    # Adjusted for BnB quantization (can use lower value like 0.3-0.5 with quantization)
+        max_model_len=1024,            # Maximum sequence length
+        quantization=BNB_QUANTIZATION  # Use BitsAndBytes for VRAM reduction
     )
 
     # Initialize the async engine during startup to avoid lazy loading on first request
