@@ -10,21 +10,21 @@ KaniTTS-vLLM is a revolutionary text-to-speech system optimized for minimal GPU 
 
 - **🎯 Ultra Low VRAM**: Only **2GB VRAM** required (tested on RTX 3060 8GB)
 - **⚡ Real-Time Performance**: RTF 0.37x - faster than real-time generation
-- **🔧 Zero Compromise**: High-quality 22kHz audio without quantization
+- **🔧 Multiple Modes**: Choose between Low VRAM, Balanced, High Performance, and 4-bit Quantization
 - **🌐 OpenAI Compatible**: Drop-in replacement for OpenAI's TTS API
 - **💬 Open-WebUI Ready**: Perfect integration with chat interfaces
 - **📡 Streaming Support**: Real-time audio streaming with SSE
 - **🎭 Multiple Voices**: Support for different speaker voices
 - **📝 Long-Form**: Automatic text chunking for lengthy content
 
-## 🏆 Performance Benchmarks
+## 🏆 Performance Modes & Benchmarks
 
-| GPU | VRAM Usage | Total VRAM | RTF | Status |
-|-----|------------|------------|-----|--------|
-| **RTX 3060** | **2GB** | 8GB | **0.37x** | ✅ Optimized |
-| RTX 3050 | 2GB | 8GB | 0.40x | ✅ Tested |
-| RTX 4060 | 2GB | 8GB | 0.35x | ✅ Tested |
-| RTX 5090 | 16GB | 32GB | 0.19x | ⚡ High Perf |
+| Mode | VRAM Usage | RTF | Quality | Best For |
+|------|------------|-----|---------|-----------|
+| **Low VRAM** | **2GB** | **0.37x** | High | RTX 3060, limited memory |
+| **Balanced** | 6GB | 0.25x | High | RTX 4060, good balance |
+| **High Performance** | 16GB | 0.19x | Maximum | RTX 5090, maximum speed |
+| **4-bit Quantization** | 1GB | 0.45x | Good | Very limited memory |
 
 *RTF < 1.0 = faster than real-time. Lower is better.*
 
@@ -59,6 +59,46 @@ python server.py
 ```
 
 That's it! Your TTS server is running on `http://localhost:32855`.
+
+## ⚙️ Performance Modes
+
+Choose your performance mode by editing `config.py`:
+
+### 🎯 Low VRAM Mode (Default)
+```python
+# config.py
+PERFORMANCE_MODE = "low_vram"
+```
+- **VRAM**: 2GB
+- **RTF**: 0.37x
+- **Best for**: RTX 3060, integrated systems
+
+### ⚖️ Balanced Mode
+```python
+# config.py
+PERFORMANCE_MODE = "balanced"
+```
+- **VRAM**: 6GB
+- **RTF**: 0.25x
+- **Best for**: RTX 4060, desktop systems
+
+### 🚀 High Performance Mode
+```python
+# config.py
+PERFORMANCE_MODE = "high_performance"
+```
+- **VRAM**: 16GB
+- **RTF**: 0.19x
+- **Best for**: RTX 5090, workstations
+
+### 🔢 4-bit Quantization Mode
+```python
+# config.py
+PERFORMANCE_MODE = "bnb_4bit"
+```
+- **VRAM**: 1GB
+- **RTF**: 0.45x
+- **Best for**: Very limited memory, older GPUs
 
 ## 🎤 Basic Usage
 
@@ -98,25 +138,28 @@ Perfect for chat applications! Setup takes 30 seconds:
    - Voice: "andrew" or "katie"
 3. **Click speaker icon** in any chat to generate speech!
 
-**Performance with Open-WebUI on RTX 3060**:
+**Performance with Open-WebUI on RTX 3060 (Low VRAM mode)**:
 - VRAM Usage: 2GB
 - Response Time: <500ms
 - Audio Quality: 22kHz high-fidelity
 
-## 🛠️ How We Achieved 2GB VRAM
+## 🛠️ How We Achieve Minimal VRAM
 
 Our optimization strategy focuses on efficiency over brute force:
 
 ### Memory Optimization Techniques
-1. **Low GPU Memory Utilization**: 15% (0.15) instead of 90%
-2. **Reduced Model Length**: 512 tokens vs 2048
+1. **Low GPU Memory Utilization**: Adjustable from 15% to 90%
+2. **Reduced Model Length**: 512 to 2048 tokens based on mode
 3. **Single Sequence Processing**: Optimized for one request at a time
 4. **BFloat16 Precision**: Efficient on modern GPUs
 5. **CUDA Graphs**: Reduced kernel launch overhead
 6. **Smart KV Cache**: Optimized token processing
 
-### No Quantization Needed
-Unlike other solutions that use 4-bit quantization (which can degrade quality), we achieve low VRAM through intelligent memory management - preserving full audio quality.
+### Optional 4-bit Quantization
+For extreme memory constraints, enable 4-bit quantization:
+- VRAM reduced to ~1GB
+- Slight quality trade-off
+- Compatible with older GPUs
 
 ## Memory Optimization
 

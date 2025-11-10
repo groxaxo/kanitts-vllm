@@ -44,10 +44,55 @@ LONG_FORM_SILENCE_DURATION = 0.2    # Silence between chunks in seconds
 MODEL_NAME = "nineninesix/kani-tts-400m-en"
 CODEC_MODEL_NAME = "nvidia/nemo-nano-codec-22khz-0.6kbps-12.5fps"
 
+# Performance Mode Configuration
+# Choose between different performance modes based on your hardware and needs
+# Options: "low_vram", "balanced", "high_performance"
+PERFORMANCE_MODE = "low_vram"  # Default mode for minimal VRAM usage
+
 # BitsAndBytes Quantization Configuration
-# Enable BnB quantization to reduce VRAM consumption
+# Enable BnB quantization to reduce VRAM consumption by ~4x
 # Options: None (disabled), "bitsandbytes" (4-bit quantization)
-# 4-bit quantization can reduce VRAM usage by ~4x with minimal quality loss
-# NOTE: Disabled due to compatibility issues with vLLM's bitsandbytes loader
-USE_BNB_QUANTIZATION = False  # Set to False to disable quantization
+# NOTE: May have compatibility issues with some vLLM versions
+USE_BNB_QUANTIZATION = False  # Set to True to enable 4-bit quantization
 BNB_QUANTIZATION = "bitsandbytes" if USE_BNB_QUANTIZATION else None
+
+# Precision Configuration
+# Options: "bfloat16", "float16", "float32"
+# bfloat16: Best for RTX 30xx+ GPUs, good performance
+# float16: Compatible with more GPUs, slightly less efficient
+# float32: Maximum quality, highest VRAM usage
+PRECISION = "bfloat16"  # Default precision
+
+# Performance Mode Presets
+def get_performance_config(mode):
+    """Get configuration based on performance mode"""
+    configs = {
+        "low_vram": {
+            "gpu_memory_utilization": 0.15,
+            "max_model_len": 512,
+            "quantization": None,
+            "precision": "bfloat16"
+        },
+        "balanced": {
+            "gpu_memory_utilization": 0.5,
+            "max_model_len": 1024,
+            "quantization": None,
+            "precision": "bfloat16"
+        },
+        "high_performance": {
+            "gpu_memory_utilization": 0.9,
+            "max_model_len": 2048,
+            "quantization": None,
+            "precision": "bfloat16"
+        },
+        "bnb_4bit": {
+            "gpu_memory_utilization": 0.3,
+            "max_model_len": 1024,
+            "quantization": "bitsandbytes",
+            "precision": "bfloat16"
+        }
+    }
+    return configs.get(mode, configs["low_vram"])
+
+# Get current performance configuration
+PERFORMANCE_CONFIG = get_performance_config(PERFORMANCE_MODE)

@@ -1,5 +1,5 @@
 # Core dependencies for KaniTTS-vLLM
-# Optimized for low VRAM usage (~2GB) while maintaining real-time performance
+# Optimized for multiple performance modes: Low VRAM, Balanced, High Performance, and 4-bit Quantization
 
 # FastAPI and web server
 fastapi>=0.104.0
@@ -19,18 +19,11 @@ vllm>=0.11.0
 # Transformers for model compatibility
 transformers==4.57.1
 
-# Optional: BitsAndBytes for quantization (currently disabled due to vLLM compatibility)
-# bitsandbytes>=0.46.1
+# BitsAndBytes for 4-bit quantization (optional)
+bitsandbytes>=0.46.1
 
 # Additional utilities
 pydantic>=2.0.0
-base64
-json
-io
-asyncio
-time
-threading
-concurrent.futures
 
 # System dependencies (install via package manager):
 # - ffmpeg (required by nemo-toolkit)

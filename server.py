@@ -13,7 +13,9 @@ import json
 
 from audio import LLMAudioPlayer, StreamingAudioWriter
 from generation.vllm_generator import VLLMTTSGenerator
-from config import CHUNK_SIZE, LOOKBACK_FRAMES, TEMPERATURE, TOP_P, MAX_TOKENS, LONG_FORM_THRESHOLD_SECONDS, LONG_FORM_SILENCE_DURATION, LONG_FORM_CHUNK_DURATION, BNB_QUANTIZATION
+from config import (CHUNK_SIZE, LOOKBACK_FRAMES, TEMPERATURE, TOP_P, MAX_TOKENS, 
+                    LONG_FORM_THRESHOLD_SECONDS, LONG_FORM_SILENCE_DURATION, 
+                    LONG_FORM_CHUNK_DURATION, PERFORMANCE_CONFIG, PERFORMANCE_MODE)
 
 from nemo.utils.nemo_logging import Logger
 
@@ -63,21 +65,24 @@ class OpenAISpeechRequest(BaseModel):
 async def startup_event():
     """Initialize models on startup"""
     global generator, player
-    print("🚀 Initializing VLLM TTS models...")
+    
+    print(f"🚀 Initializing VLLM TTS models in '{PERFORMANCE_MODE}' mode...")
+    print(f"📊 Configuration: {PERFORMANCE_CONFIG}")
 
-    # Use VLLM for faster inference with BnB quantization for reduced VRAM
+    # Use performance configuration from config.py
     generator = VLLMTTSGenerator(
-        tensor_parallel_size=1,        # Increase for multi-GPU
-        gpu_memory_utilization=0.15,   # Reduced to 0.15 due to limited available GPU memory
-        max_model_len=512,             # Reduced sequence length to save memory
-        quantization=BNB_QUANTIZATION  # Use BitsAndBytes for VRAM reduction
+        tensor_parallel_size=1,                           # Single GPU
+        gpu_memory_utilization=PERFORMANCE_CONFIG["gpu_memory_utilization"],
+        max_model_len=PERFORMANCE_CONFIG["max_model_len"],
+        quantization=PERFORMANCE_CONFIG["quantization"],
+        dtype=PERFORMANCE_CONFIG["precision"]
     )
 
     # Initialize the async engine during startup to avoid lazy loading on first request
     await generator.initialize_engine()
 
     player = LLMAudioPlayer(generator.tokenizer)
-    print("✅ VLLM TTS models initialized successfully!")
+    print(f"✅ VLLM TTS models initialized successfully in '{PERFORMANCE_MODE}' mode!")
 
 
 @app.get("/health")
