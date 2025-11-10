@@ -25,6 +25,9 @@ bitsandbytes>=0.46.1
 # Additional utilities
 pydantic>=2.0.0
 
+# Language detection
+langdetect>=1.0.9
+
 # System dependencies (install via package manager):
 # - ffmpeg (required by nemo-toolkit)
 #   Ubuntu/Debian: sudo apt install ffmpeg

@@ -13,9 +13,11 @@ import json
 
 from audio import LLMAudioPlayer, StreamingAudioWriter
 from generation.vllm_generator import VLLMTTSGenerator
+from generation.multi_language_generator import MultiLanguageGenerator
 from config import (CHUNK_SIZE, LOOKBACK_FRAMES, TEMPERATURE, TOP_P, MAX_TOKENS, 
                     LONG_FORM_THRESHOLD_SECONDS, LONG_FORM_SILENCE_DURATION, 
-                    LONG_FORM_CHUNK_DURATION, PERFORMANCE_CONFIG, PERFORMANCE_MODE)
+                    LONG_FORM_CHUNK_DURATION, PERFORMANCE_CONFIG, PERFORMANCE_MODE,
+                    MULTI_LANGUAGE_MODE, LANGUAGE_MODELS, VOICE_PREFERENCES)
 
 from nemo.utils.nemo_logging import Logger
 
@@ -37,6 +39,7 @@ app.add_middleware(
 # Global instances (initialized on startup)
 generator = None
 player = None
+multi_language_generator = None  # Used when MULTI_LANGUAGE_MODE is enabled
 
 
 class TTSRequest(BaseModel):
@@ -64,52 +67,109 @@ class OpenAISpeechRequest(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     """Initialize models on startup"""
-    global generator, player
+    global generator, player, multi_language_generator
     
     print(f"🚀 Initializing VLLM TTS models in '{PERFORMANCE_MODE}' mode...")
     print(f"📊 Configuration: {PERFORMANCE_CONFIG}")
 
-    # Use performance configuration from config.py
-    generator = VLLMTTSGenerator(
-        tensor_parallel_size=1,                           # Single GPU
-        gpu_memory_utilization=PERFORMANCE_CONFIG["gpu_memory_utilization"],
-        max_model_len=PERFORMANCE_CONFIG["max_model_len"],
-        quantization=PERFORMANCE_CONFIG["quantization"],
-        dtype=PERFORMANCE_CONFIG["precision"]
-    )
+    if MULTI_LANGUAGE_MODE:
+        # Initialize multi-language generator with both English and Spanish models
+        print("🌍 Multi-language mode enabled - initializing English and Spanish models...")
+        print(f"📝 Voice preferences: {VOICE_PREFERENCES}")
+        
+        multi_language_generator = MultiLanguageGenerator(
+            language_configs=LANGUAGE_MODELS,
+            voice_preferences=VOICE_PREFERENCES,
+            tensor_parallel_size=1,
+            gpu_memory_utilization=PERFORMANCE_CONFIG["gpu_memory_utilization"],
+            max_model_len=PERFORMANCE_CONFIG["max_model_len"],
+            quantization=PERFORMANCE_CONFIG["quantization"],
+            dtype=PERFORMANCE_CONFIG["precision"]
+        )
+        
+        # Initialize all language models
+        await multi_language_generator.initialize_all_languages()
+        
+        print(f"✅ Multi-language TTS initialized successfully with {len(LANGUAGE_MODELS)} languages!")
+    else:
+        # Single language mode (legacy behavior)
+        print("🔤 Single language mode - initializing default model...")
+        
+        generator = VLLMTTSGenerator(
+            tensor_parallel_size=1,
+            gpu_memory_utilization=PERFORMANCE_CONFIG["gpu_memory_utilization"],
+            max_model_len=PERFORMANCE_CONFIG["max_model_len"],
+            quantization=PERFORMANCE_CONFIG["quantization"],
+            dtype=PERFORMANCE_CONFIG["precision"]
+        )
 
-    # Initialize the async engine during startup to avoid lazy loading on first request
-    await generator.initialize_engine()
+        # Initialize the async engine during startup to avoid lazy loading on first request
+        await generator.initialize_engine()
 
-    player = LLMAudioPlayer(generator.tokenizer)
-    print(f"✅ VLLM TTS models initialized successfully in '{PERFORMANCE_MODE}' mode!")
+        player = LLMAudioPlayer(generator.tokenizer)
+        print(f"✅ VLLM TTS models initialized successfully in '{PERFORMANCE_MODE}' mode!")
 
 
 @app.get("/health")
 async def health_check():
     """Check if server is ready"""
-    return {
-        "status": "healthy",
-        "tts_initialized": generator is not None and player is not None
-    }
+    if MULTI_LANGUAGE_MODE:
+        return {
+            "status": "healthy",
+            "mode": "multi-language",
+            "languages_initialized": list(multi_language_generator.generators.keys()) if multi_language_generator else [],
+            "tts_initialized": multi_language_generator is not None
+        }
+    else:
+        return {
+            "status": "healthy",
+            "mode": "single-language",
+            "tts_initialized": generator is not None and player is not None
+        }
 
 
 @app.post("/v1/audio/speech")
 async def openai_speech(request: OpenAISpeechRequest):
-    """OpenAI-compatible speech generation endpoint
+    """OpenAI-compatible speech generation endpoint with multi-language support
 
     Supports both streaming (SSE) and non-streaming modes:
     - Without stream_format: Returns complete audio file (WAV or PCM)
     - With stream_format="sse": Returns Server-Sent Events with audio chunks
+    
+    In multi-language mode:
+    - Automatically detects language of input text
+    - Routes to appropriate English or Spanish model
+    - Uses language-specific voice preferences
     """
-    if not generator or not player:
-        raise HTTPException(status_code=503, detail="TTS models not initialized")
+    # Check initialization based on mode
+    if MULTI_LANGUAGE_MODE:
+        if not multi_language_generator:
+            raise HTTPException(status_code=503, detail="Multi-language TTS models not initialized")
+        
+        # Detect language and select appropriate generator/player
+        detected_language = multi_language_generator.detect_and_route(request.input)
+        generator = multi_language_generator.get_generator(detected_language)
+        player = multi_language_generator.get_player(detected_language)
+        
+        # Determine voice to use for this language
+        # If user didn't specify "random", check if their requested voice is valid for this language
+        if request.voice != "random":
+            voice_to_use = multi_language_generator.get_voice_for_language(detected_language, request.voice)
+        else:
+            voice_to_use = request.voice
+        
+        print(f"[Server] Language: {detected_language}, Voice: {voice_to_use}")
+    else:
+        # Single language mode
+        if not generator or not player:
+            raise HTTPException(status_code=503, detail="TTS models not initialized")
+        voice_to_use = request.voice
 
     # Prepare prompt text with voice prefix (unless voice is "random")
-    if request.voice == "random":
+    if voice_to_use == "random":
         prompt_text = request.input
     else:
-        prompt_text = f"{request.voice}: {request.input}"
+        prompt_text = f"{voice_to_use}: {request.input}"
 
     # Streaming mode (SSE)
     if request.stream_format == "sse":
@@ -123,7 +183,11 @@ async def openai_speech(request: OpenAISpeechRequest):
 
             # Estimate duration to determine if we need long-form generation
             estimated_duration = estimate_duration(request.input)
-            voice_for_generation = request.voice if request.voice != "random" else "andrew"
+            # In multi-language mode, use language-specific default voice
+            if MULTI_LANGUAGE_MODE and voice_to_use == "random":
+                voice_for_generation = multi_language_generator.voice_preferences.get(detected_language, "andrew")
+            else:
+                voice_for_generation = voice_to_use if voice_to_use != "random" else "andrew"
             use_long_form = estimated_duration > LONG_FORM_THRESHOLD_SECONDS
 
             # Track token counts for usage reporting
@@ -293,7 +357,11 @@ async def openai_speech(request: OpenAISpeechRequest):
             estimated_duration = estimate_duration(request.input)
 
             # Determine voice for long-form generation
-            voice_for_generation = request.voice if request.voice != "random" else "andrew"
+            # In multi-language mode, use language-specific default voice
+            if MULTI_LANGUAGE_MODE and voice_to_use == "random":
+                voice_for_generation = multi_language_generator.voice_preferences.get(detected_language, "andrew")
+            else:
+                voice_for_generation = voice_to_use if voice_to_use != "random" else "andrew"
 
             # Use long-form generation for longer texts
             use_long_form = estimated_duration > 15.0
