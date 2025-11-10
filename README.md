@@ -8,13 +8,15 @@ KaniTTS-vLLM is a revolutionary text-to-speech system optimized for minimal GPU 
 
 ## ✨ Key Features
 
-- **🎯 Ultra Low VRAM**: Only **2GB VRAM** required (tested on RTX 3060 8GB)
+- **🌍 Multi-Language Support**: Automatic language detection with English and Spanish models running in parallel
+- **🔍 Smart Routing**: Automatically detects language and routes to the correct model
+- **🎯 Ultra Low VRAM**: Only **2GB VRAM** per model (4GB for dual-language mode)
 - **⚡ Real-Time Performance**: RTF 0.37x - faster than real-time generation
 - **🔧 Multiple Modes**: Choose between Low VRAM, Balanced, High Performance, and 4-bit Quantization
 - **🌐 OpenAI Compatible**: Drop-in replacement for OpenAI's TTS API
 - **💬 Open-WebUI Ready**: Perfect integration with chat interfaces
 - **📡 Streaming Support**: Real-time audio streaming with SSE
-- **🎭 Multiple Voices**: Support for different speaker voices
+- **🎭 Multiple Voices**: Support for different speaker voices per language
 - **📝 Long-Form**: Automatic text chunking for lengthy content
 
 ## 🏆 Performance Modes & Benchmarks
@@ -178,10 +180,14 @@ This implementation is heavily optimized for **minimal VRAM usage** while mainta
 
 | Configuration | VRAM Usage | GPU Examples | Performance |
 |--------------|------------|--------------|-------------|
-| Optimized (current) | ~2GB | RTX 3060 (8GB), RTX 3050 (8GB) | RTF 0.37x |
-| Standard | ~12-16GB | RTX 4090, RTX 5090 | RTF 0.19x |
+| Single Model (Low VRAM) | ~2GB | RTX 3060 (8GB), RTX 3050 (8GB) | RTF 0.37x |
+| Multi-Language (Low VRAM) | ~4GB | RTX 3060 (8GB), RTX 4060 (8GB) | RTF 0.37x per model |
+| Single Model (Standard) | ~12-16GB | RTX 4090, RTX 5090 | RTF 0.19x |
+| Multi-Language (High Perf) | ~32GB | RTX 5090, A100 | RTF 0.19x per model |
 
-*Tested on RTX 3060 8GB with Open-WebUI endpoint integration*
+*Multi-language mode loads both English and Spanish models simultaneously, roughly doubling VRAM usage*
+
+**Note:** If you have limited VRAM (less than 6GB), consider setting `MULTI_LANGUAGE_MODE = False` in `config.py` to use only one language model at a time.
 
 ### Configuration
 
@@ -207,48 +213,116 @@ USE_BNB_QUANTIZATION = False  # Disabled due to vLLM compatibility
 
 ## Language Support
 
-KaniTTS-vLLM supports multiple languages through different models. To use a different language, configure the model in `config.py`.
+KaniTTS-vLLM supports multiple languages with **automatic language detection** and parallel model execution!
 
-### Using Spanish
+### 🌍 Multi-Language Mode (NEW!)
 
-To configure KaniTTS-vLLM for Spanish:
+**Multi-language mode is now enabled by default**, running both English and Spanish models in parallel with automatic language detection. The system automatically detects the language of your input text and routes it to the appropriate model.
 
-1. **Edit `config.py`** and change the `MODEL_NAME`:
-   ```python
-   MODEL_NAME = "nineninesix/kani-tts-400m-es"
-   ```
+#### Features:
+- 🔍 **Automatic Language Detection**: Detects English vs Spanish automatically
+- 🚀 **Parallel Execution**: Both models loaded and ready simultaneously
+- 🎤 **Voice Preferences**: Configure preferred voices for each language
+- 🎯 **Seamless Routing**: Text automatically sent to the correct model
 
-2. **Restart the server** to load the Spanish model:
-   ```bash
-   uv run python server.py
-   ```
-   The Spanish model will be automatically downloaded on first run.
+#### Configuration
 
-3. **Use Spanish voices** in your requests. Available Spanish voices include:
-   - `nova`
-   - `ballad`
-   - `ash`
+Edit `config.py` to customize multi-language settings:
 
-4. **Example Spanish request**:
-   ```bash
-   curl -X POST http://localhost:8000/v1/audio/speech \
-     -H "Content-Type: application/json" \
-     -d '{
-       "input": "Hola, esto es una prueba del sistema de texto a voz para español.",
-       "voice": "nova",
-       "response_format": "wav"
-     }' \
-     --output speech_es.wav
-   ```
+```python
+# Enable/disable multi-language mode
+MULTI_LANGUAGE_MODE = True  # Default: True
+
+# Voice preferences for each language
+VOICE_PREFERENCES = {
+    "en": "andrew",  # Your preferred English voice
+    "es": "nova"     # Your preferred Spanish voice
+}
+```
+
+#### Available Voices
+
+**English** (`nineninesix/kani-tts-400m-en`):
+- `andrew` - Male voice
+- `katie` - Female voice
+
+**Spanish** (`nineninesix/kani-tts-400m-es`):
+- `nova` - Voice 1
+- `ballad` - Voice 2
+- `ash` - Voice 3
+
+#### Usage Examples
+
+The API automatically detects language, so you just send your text:
+
+**English Example:**
+```bash
+curl -X POST http://localhost:32855/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": "Hello! This is an amazing text-to-speech system.",
+    "voice": "andrew",
+    "response_format": "wav"
+  }' \
+  --output english.wav
+```
+
+**Spanish Example:**
+```bash
+curl -X POST http://localhost:32855/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": "¡Hola! Este es un sistema increíble de texto a voz.",
+    "voice": "nova",
+    "response_format": "wav"
+  }' \
+  --output spanish.wav
+```
+
+**Using Voice Preferences:**
+```bash
+# If you don't specify a voice, it uses your configured preference
+curl -X POST http://localhost:32855/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": "This will use the English voice preference (andrew by default)"
+  }' \
+  --output english_pref.wav
+```
+
+#### How It Works
+
+1. **Text Submitted**: You send text via the API
+2. **Language Detection**: System detects if text is English or Spanish
+3. **Model Selection**: Routes to the appropriate model automatically
+4. **Voice Selection**: Uses your voice preference or requested voice for that language
+5. **Audio Generation**: Generates speech with the correct model and voice
+
+### Single Language Mode
+
+If you prefer to use only one language model (lower VRAM usage), you can disable multi-language mode:
+
+```python
+# config.py
+MULTI_LANGUAGE_MODE = False
+MODEL_NAME = "nineninesix/kani-tts-400m-en"  # or "nineninesix/kani-tts-400m-es"
+```
+
+Then restart the server:
+```bash
+python server.py
+```
 
 ### Other Languages
 
-Other language models are available at [https://huggingface.co/nineninesix](https://huggingface.co/nineninesix). To use them:
+Other language models are available at [https://huggingface.co/nineninesix](https://huggingface.co/nineninesix). To add support for additional languages:
 
 1. Find the model for your desired language on HuggingFace
-2. Update `MODEL_NAME` in `config.py` to the model path
-3. Refer to the model's card for available voices
-4. Restart the server and use the appropriate voices for that language
+2. Add it to `LANGUAGE_MODELS` in `config.py`
+3. Add voice preferences for the new language
+4. Restart the server
+
+**Note:** Automatic language detection currently supports English and Spanish. For other languages, you may need to extend the `LanguageDetector` class in `generation/language_detection.py`.
 
 ## API Reference
 
