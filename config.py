@@ -44,6 +44,31 @@ LONG_FORM_SILENCE_DURATION = 0.2    # Silence between chunks in seconds
 MODEL_NAME = "nineninesix/kani-tts-400m-en"
 CODEC_MODEL_NAME = "nvidia/nemo-nano-codec-22khz-0.6kbps-12.5fps"
 
+# Multi-Language Configuration
+# Enable dual-language mode to run both English and Spanish models in parallel
+MULTI_LANGUAGE_MODE = True  # Set to False to use single language (MODEL_NAME above)
+
+# Language-specific model configurations
+LANGUAGE_MODELS = {
+    "en": {
+        "model_name": "nineninesix/kani-tts-400m-en",
+        "default_voice": "andrew",
+        "available_voices": ["andrew", "katie"]
+    },
+    "es": {
+        "model_name": "nineninesix/kani-tts-400m-es",
+        "default_voice": "nova",
+        "available_voices": ["nova", "ballad", "ash"]
+    }
+}
+
+# User voice preferences (configurable)
+# Users can set their preferred voice for each language
+VOICE_PREFERENCES = {
+    "en": "andrew",  # English voice preference
+    "es": "nova"     # Spanish voice preference
+}
+
 # Performance Mode Configuration
 # Choose between different performance modes based on your hardware and needs
 # Options: "low_vram", "balanced", "high_performance"

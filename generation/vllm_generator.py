@@ -16,7 +16,7 @@ from config import (
 
 
 class VLLMTTSGenerator:
-    def __init__(self, tensor_parallel_size=1, gpu_memory_utilization=0.9, max_model_len=2048, quantization=None):
+    def __init__(self, tensor_parallel_size=1, gpu_memory_utilization=0.9, max_model_len=2048, quantization=None, model_name=None, dtype="bfloat16"):
         """Initialize VLLM-based TTS generator with async streaming support
 
         Args:
@@ -24,8 +24,12 @@ class VLLMTTSGenerator:
             gpu_memory_utilization: Fraction of GPU memory to use (0.0 to 1.0)
             max_model_len: Maximum sequence length
             quantization: Quantization method (e.g., "bitsandbytes" for 4-bit quantization)
+            model_name: Model name to load (defaults to MODEL_NAME from config)
+            dtype: Model precision (e.g., "bfloat16", "float16")
         """
-        print(f"Loading VLLM AsyncLLMEngine model: {MODEL_NAME}")
+        # Use provided model_name or fall back to config
+        self.model_name = model_name if model_name is not None else MODEL_NAME
+        print(f"Loading VLLM AsyncLLMEngine model: {self.model_name}")
         
         # Use BnB quantization from config if not explicitly provided
         if quantization is None:
@@ -36,13 +40,13 @@ class VLLMTTSGenerator:
 
         # Configure engine arguments
         engine_args = AsyncEngineArgs(
-            model=MODEL_NAME,
+            model=self.model_name,
             tensor_parallel_size=tensor_parallel_size,
             max_model_len=max_model_len,
             gpu_memory_utilization=gpu_memory_utilization,
             enforce_eager=False,  # Allow CUDA graphs (reduces kernel launch overhead)
             max_num_seqs=1,  # Single sequence for TTS - enables better CUDA graph optimization
-            dtype="bfloat16",  # BF16 for faster inference on RTX 5090
+            dtype=dtype,  # Model precision (bfloat16 for RTX 30xx+)
             quantization=quantization,  # BitsAndBytes quantization for reduced VRAM
         )
 
@@ -50,7 +54,7 @@ class VLLMTTSGenerator:
         self.engine = None  # Will be initialized in async context
         self.engine_args = engine_args
 
-        self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
 
         # Pre-configure sampling parameters
         self.sampling_params = SamplingParams(
