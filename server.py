@@ -68,8 +68,8 @@ async def startup_event():
     # Use VLLM for faster inference with BnB quantization for reduced VRAM
     generator = VLLMTTSGenerator(
         tensor_parallel_size=1,        # Increase for multi-GPU
-        gpu_memory_utilization=0.5,    # Adjusted for BnB quantization (can use lower value like 0.3-0.5 with quantization)
-        max_model_len=1024,            # Maximum sequence length
+        gpu_memory_utilization=0.15,   # Reduced to 0.15 due to limited available GPU memory
+        max_model_len=512,             # Reduced sequence length to save memory
         quantization=BNB_QUANTIZATION  # Use BitsAndBytes for VRAM reduction
     )
 
@@ -377,4 +377,4 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     print("🎤 Starting Kani TTS Server...")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=32855)

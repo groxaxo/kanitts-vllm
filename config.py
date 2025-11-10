@@ -48,5 +48,6 @@ CODEC_MODEL_NAME = "nvidia/nemo-nano-codec-22khz-0.6kbps-12.5fps"
 # Enable BnB quantization to reduce VRAM consumption
 # Options: None (disabled), "bitsandbytes" (4-bit quantization)
 # 4-bit quantization can reduce VRAM usage by ~4x with minimal quality loss
-USE_BNB_QUANTIZATION = True  # Set to False to disable quantization
+# NOTE: Disabled due to compatibility issues with vLLM's bitsandbytes loader
+USE_BNB_QUANTIZATION = False  # Set to False to disable quantization
 BNB_QUANTIZATION = "bitsandbytes" if USE_BNB_QUANTIZATION else None
