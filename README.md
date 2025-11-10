@@ -47,7 +47,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
 
 # 3. Clone and setup
-git clone https://github.com/your-username/kanitts-vllm.git
+git clone https://github.com/groxaxo/kanitts-vllm.git
 cd kanitts-vllm
 uv venv && source .venv/bin/activate
 
