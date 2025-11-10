@@ -298,6 +298,27 @@ curl -X POST http://localhost:32855/v1/audio/speech \
 4. **Voice Selection**: Uses your voice preference or requested voice for that language
 5. **Audio Generation**: Generates speech with the correct model and voice
 
+#### Testing Multi-Language Support
+
+Run the example scripts to test all voices and languages:
+
+**Bash Script:**
+```bash
+./examples_multi_language.sh
+```
+
+**Python Script:**
+```bash
+python example_multi_language.py
+```
+
+These scripts will:
+- Test all English voices (andrew, katie)
+- Test all Spanish voices (nova, ballad, ash)
+- Test voice preferences
+- Test long-form generation
+- Save audio files to `/tmp/tts_examples/`
+
 ### Single Language Mode
 
 If you prefer to use only one language model (lower VRAM usage), you can disable multi-language mode:
