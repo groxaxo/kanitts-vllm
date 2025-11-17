@@ -737,11 +737,13 @@ ENV PATH="/root/.cargo/bin:$PATH"
 # Copy project files
 COPY . .
 
-# Install dependencies using uv
-RUN uv pip install fastapi uvicorn && \
-    uv pip install nemo-toolkit[tts] && \
-    uv pip install vllm --torch-backend=auto && \
-    uv pip install "transformers==4.57.1"
+# Install dependencies using uv (in correct order to avoid conflicts)
+RUN uv pip install "transformers==4.52.0" && \
+    uv pip install torch numpy scipy && \
+    uv pip install "bitsandbytes==0.45.5" && \
+    uv pip install fastapi uvicorn && \
+    uv pip install "nemo-toolkit[tts]==2.4.0" && \
+    uv pip install "vllm==0.9.0"
 
 # Expose port
 EXPOSE 8000

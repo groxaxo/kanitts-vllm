@@ -4,6 +4,17 @@
 
 KaniTTS-vLLM is optimized to run on **just 2GB VRAM** while delivering real-time text-to-speech performance. This guide walks you through the complete setup process.
 
+### Important: Dependency Version Compatibility
+
+This project requires specific versions of dependencies to ensure compatibility:
+- **transformers==4.52.0** (required by both vllm and nemo-toolkit)
+- **vllm==0.9.0** (compatible with transformers 4.52.0)
+- **nemo-toolkit[tts]==2.4.0** (requires transformers<=4.52.0 and numpy<2.0.0)
+- **bitsandbytes==0.45.5** (required by nemo-toolkit)
+- **numpy<2.0.0** (required by nemo-toolkit)
+
+The installation process installs these dependencies in the correct order to avoid conflicts.
+
 ## System Requirements
 
 - **OS**: Linux (Ubuntu 20.04+, CentOS 8+, or similar)
@@ -53,12 +64,19 @@ uv pip install -r requirements.txt
 ### 4. Verify Installation
 
 ```bash
-# Test CUDA availability
-python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+# Run the verification script to check all dependencies
+python verify_installation.py
 
-# Test vLLM installation
+# Alternatively, test individual components
+python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
 python -c "import vllm; print('vLLM installed successfully')"
 ```
+
+The verification script will check:
+- All critical packages are installed with correct versions
+- Transformers, vLLM, nemo-toolkit, bitsandbytes compatibility
+- NumPy version constraint (<2.0.0)
+- Web server dependencies (FastAPI, Uvicorn)
 
 ### 5. Start the Server
 
@@ -80,12 +98,14 @@ source venv/bin/activate
 # Upgrade pip
 pip install --upgrade pip
 
-# Install dependencies in order
-pip install fastapi uvicorn
+# Install dependencies in correct order to avoid conflicts
+pip install "transformers==4.52.0"
+pip install "torch>=2.1.0" "numpy>=1.24.0,<2.0.0" "scipy>=1.11.0"
+pip install "bitsandbytes==0.45.5"
+pip install "fastapi>=0.104.0" "uvicorn[standard]>=0.24.0"
 pip install "nemo-toolkit[tts]==2.4.0"
-pip install vllm --torch-backend=auto
-pip install "transformers==4.57.1"
-pip install torch numpy scipy pydantic
+pip install "vllm==0.9.0"
+pip install "pydantic>=2.0.0" "langdetect>=1.0.9"
 ```
 
 ## Configuration for Low VRAM
@@ -103,6 +123,25 @@ generator = VLLMTTSGenerator(
 ```
 
 ## Troubleshooting
+
+### Dependency Conflicts
+
+If you encounter dependency conflict errors during installation:
+
+1. **Error: "Cannot install nemo-toolkit[tts]==2.4.0 and transformers==X.Y.Z"**
+   - This project requires specific compatible versions
+   - Make sure you're using `transformers==4.52.0`, `vllm==0.9.0`, and `bitsandbytes==0.45.5`
+   - Delete your virtual environment and reinstall: `rm -rf venv && python3.10 -m venv venv`
+
+2. **Error: "ResolutionImpossible: for help visit..."**
+   - Ensure you install dependencies in the correct order (transformers first)
+   - Use the provided `requirements.txt` which has the correct order
+   - Alternatively, follow the manual installation steps exactly as shown
+
+3. **Wrong package versions installed**
+   - Check installed versions: `pip list | grep -E "(transformers|vllm|nemo-toolkit|bitsandbytes)"`
+   - Should show: transformers==4.52.0, vllm==0.9.0, nemo-toolkit==2.4.0, bitsandbytes==0.45.5
+   - If not, reinstall with: `pip install --force-reinstall -r requirements.txt`
 
 ### Out of Memory Errors
 
