@@ -3,7 +3,7 @@
 
 # IMPORTANT: Install transformers first to prevent version conflicts
 # Transformers for model compatibility (must be installed before nemo-toolkit and vllm)
-transformers==4.52.0
+transformers==4.53.2
 
 # PyTorch ecosystem
 torch>=2.1.0
@@ -11,17 +11,17 @@ numpy>=1.24.0,<2.0.0
 scipy>=1.11.0
 
 # BitsAndBytes for 4-bit quantization (required by nemo-toolkit)
-bitsandbytes==0.45.5
+bitsandbytes==0.46.0
 
 # FastAPI and web server
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 
-# Audio processing (requires transformers<=4.52.0)
-nemo-toolkit[tts]==2.4.0
+# Audio processing (requires transformers~=4.53.0)
+nemo-toolkit[tts]==2.5.3
 
-# vLLM for optimized inference (requires transformers>=4.51.1, compatible with 4.52.0)
-vllm==0.9.0
+# vLLM for optimized inference (requires transformers>=4.53.2, uses outlines-core==0.2.10 directly)
+vllm==0.10.0
 
 # Additional utilities
 pydantic>=2.0.0
