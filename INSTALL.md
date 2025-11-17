@@ -19,24 +19,28 @@ The installation process installs these dependencies in the correct order to avo
 ## System Requirements
 
 - **OS**: Linux (Ubuntu 20.04+, CentOS 8+, or similar)
-- **Python**: 3.10 - 3.12
+- **Python**: 3.10, 3.11, or 3.12 (Python 3.13+ is NOT supported - see note below)
 - **GPU**: NVIDIA GPU with CUDA 12.8+ support
 - **VRAM**: Minimum 2GB (tested on RTX 3060 8GB)
 - **RAM**: 8GB+ recommended
 - **Storage**: 5GB free space for models
+
+> **⚠️ Python Version Note:** Python 3.13 and newer are not supported due to dependency conflicts.
+> The issue is that `nemo-toolkit` requires `numpy<2.0.0`, but `ml-dtypes>=0.5.0` requires `numpy>=2.1.0` 
+> on Python 3.13+. These requirements are incompatible. Please use Python 3.10, 3.11, or 3.12.
 
 ## Quick Install (Recommended)
 
 ### 1. Install System Dependencies
 
 ```bash
-# Ubuntu/Debian
+# Ubuntu/Debian (use python3.10, python3.11, or python3.12)
 sudo apt update
-sudo apt install -y python3.10 python3.10-venv python3-pip curl git ffmpeg
+sudo apt install -y python3.12 python3.12-venv python3-pip curl git ffmpeg
 
-# CentOS/RHEL
+# CentOS/RHEL (use python3.10, python3.11, or python3.12)
 sudo yum update
-sudo yum install -y python3.10 python3-pip curl git ffmpeg
+sudo yum install -y python3.12 python3-pip curl git ffmpeg
 ```
 
 ### 2. Install uv (Fast Python Package Manager)
@@ -54,8 +58,8 @@ uv --version
 git clone https://github.com/your-username/kanitts-vllm.git
 cd kanitts-vllm
 
-# Create virtual environment
-uv venv
+# Create virtual environment with Python 3.12 (or 3.10/3.11)
+uv venv --python 3.12
 source .venv/bin/activate
 
 # Install dependencies
@@ -92,8 +96,8 @@ The server will start on `http://localhost:32855` and automatically download mod
 If you prefer not to use uv, you can install with pip:
 
 ```bash
-# Create virtual environment
-python3.10 -m venv venv
+# Create virtual environment with Python 3.10, 3.11, or 3.12
+python3.12 -m venv venv
 source venv/bin/activate
 
 # Upgrade pip
@@ -124,6 +128,48 @@ generator = VLLMTTSGenerator(
 ```
 
 ## Troubleshooting
+
+### Python 3.13+ Incompatibility
+
+If you get an error like "No solution found when resolving dependencies" with Python 3.13:
+
+```
+× No solution found when resolving dependencies:
+  ╰─▶ Because ml-dtypes>=0.5.0 depends on numpy>=2.1.0 and only the following
+      versions of ml-dtypes are available:
+          ml-dtypes<=0.5.0
+          ml-dtypes==0.5.1
+          ml-dtypes==0.5.3
+          ml-dtypes==0.5.4
+      we can conclude that ml-dtypes>=0.5.0 depends on numpy>=2.1.0.
+      And because you require numpy>=1.24.0,<2.0.0 and ml-dtypes>=0.5.0, we
+      can conclude that your requirements are unsatisfiable.
+```
+
+**Solution:** This project is not compatible with Python 3.13 or newer. Use Python 3.10, 3.11, or 3.12 instead:
+
+```bash
+# Check your Python version
+python3 --version
+
+# If using Python 3.13, install Python 3.12
+sudo apt install python3.12 python3.12-venv
+
+# Create virtual environment with Python 3.12
+python3.12 -m venv venv
+source venv/bin/activate
+
+# Verify correct version
+python --version  # Should show Python 3.12.x
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+**Why?** The dependency conflict occurs because:
+- `nemo-toolkit[tts]` requires `numpy<2.0.0`
+- `ml-dtypes>=0.5.0` requires `numpy>=2.1.0` when using Python 3.13+
+- These requirements are incompatible
 
 ### Dependency Conflicts
 

@@ -1,5 +1,11 @@
 # Core dependencies for KaniTTS-vLLM
 # Optimized for multiple performance modes: Low VRAM, Balanced, High Performance, and 4-bit Quantization
+#
+# PYTHON VERSION REQUIREMENT: This project requires Python 3.10, 3.11, or 3.12
+# Python 3.13+ is NOT supported due to numpy version conflicts:
+#   - nemo-toolkit requires numpy<2.0.0
+#   - ml-dtypes>=0.5.0 requires numpy>=2.1.0 on Python 3.13+
+# These requirements are incompatible. Use Python 3.10-3.12 instead.
 
 # IMPORTANT: Install transformers first to prevent version conflicts
 # Transformers for model compatibility (must be installed before nemo-toolkit and vllm)
@@ -12,7 +18,9 @@ scipy>=1.11.0
 
 # ml_dtypes: Required by onnx>=1.17.0 for float4_e2m1fn type support
 # Must be >=0.5.0 to avoid AttributeError with onnx 1.19.0
-ml_dtypes>=0.5.0
+# Note: ml-dtypes 0.5.0+ requires numpy>=2.1.0 on Python 3.13+, which conflicts with nemo-toolkit
+# This project requires Python 3.10-3.12 to avoid this conflict
+ml_dtypes>=0.5.0; python_version<'3.13'
 
 # BitsAndBytes for 4-bit quantization (required by nemo-toolkit)
 bitsandbytes==0.46.0
