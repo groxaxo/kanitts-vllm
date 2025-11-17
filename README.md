@@ -616,6 +616,17 @@ curl -X POST http://localhost:8000/v1/audio/speech \
 
 ## Troubleshooting
 
+### Installation Error: ml_dtypes AttributeError
+
+**Error**: `AttributeError: module 'ml_dtypes' has no attribute 'float4_e2m1fn'`
+
+**Quick Fix**:
+```bash
+pip install --upgrade 'ml_dtypes>=0.5.0'
+```
+
+This error occurs when ml_dtypes is too old (< 0.5.0). The onnx package requires ml_dtypes>=0.5.0 for the float4_e2m1fn type. See [TROUBLESHOOTING_ML_DTYPES.md](TROUBLESHOOTING_ML_DTYPES.md) for detailed information.
+
 ### Out of Memory (OOM)
 
 **The default configuration uses only ~2GB VRAM**. If still experiencing OOM:
