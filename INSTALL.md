@@ -64,12 +64,19 @@ uv pip install -r requirements.txt
 ### 4. Verify Installation
 
 ```bash
-# Test CUDA availability
-python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+# Run the verification script to check all dependencies
+python verify_installation.py
 
-# Test vLLM installation
+# Alternatively, test individual components
+python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
 python -c "import vllm; print('vLLM installed successfully')"
 ```
+
+The verification script will check:
+- All critical packages are installed with correct versions
+- Transformers, vLLM, nemo-toolkit, bitsandbytes compatibility
+- NumPy version constraint (<2.0.0)
+- Web server dependencies (FastAPI, Uvicorn)
 
 ### 5. Start the Server
 
