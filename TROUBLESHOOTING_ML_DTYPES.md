@@ -64,8 +64,8 @@ pip install -r requirements.txt
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.cargo/bin/env
 
-# Create and activate virtual environment
-uv venv
+# Create and activate virtual environment (with Python 3.10, 3.11, or 3.12)
+uv venv --python 3.12
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
@@ -112,10 +112,66 @@ This format is used in machine learning for extreme quantization scenarios.
 | onnx | 1.17.0 | Started using float4_e2m1fn type |
 | nemo-toolkit | 2.5.3 | Dependencies include onnx>=1.17.0 |
 
+## Python 3.13+ Incompatibility
+
+### Error: "No solution found when resolving dependencies"
+
+If you're using Python 3.13 or newer, you may encounter this error:
+
+```
+× No solution found when resolving dependencies:
+  ╰─▶ Because ml-dtypes>=0.5.0 depends on numpy>=2.1.0 and only the following
+      versions of ml-dtypes are available:
+          ml-dtypes<=0.5.0
+          ml-dtypes==0.5.1
+          ml-dtypes==0.5.3
+          ml-dtypes==0.5.4
+      we can conclude that ml-dtypes>=0.5.0 depends on numpy>=2.1.0.
+      And because you require numpy>=1.24.0,<2.0.0 and ml-dtypes>=0.5.0, we
+      can conclude that your requirements are unsatisfiable.
+```
+
+### Why This Happens
+
+Starting with Python 3.13, `ml-dtypes>=0.5.0` requires `numpy>=2.1.0`. However, `nemo-toolkit[tts]` requires `numpy<2.0.0`. These requirements are incompatible.
+
+### Solution
+
+**Use Python 3.10, 3.11, or 3.12 instead of Python 3.13+:**
+
+```bash
+# Check your Python version
+python3 --version
+
+# Install Python 3.12 (if needed)
+sudo apt install python3.12 python3.12-venv
+
+# Create virtual environment with Python 3.12
+python3.12 -m venv venv
+source venv/bin/activate
+
+# Verify correct version
+python --version  # Should show Python 3.12.x
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+Or with uv:
+
+```bash
+# Create virtual environment with Python 3.12
+uv venv --python 3.12
+source .venv/bin/activate
+
+# Install dependencies
+uv pip install -r requirements.txt
+```
+
 ## Related Issues
 
 - If you see errors about other missing attributes in ml_dtypes, the solution is the same
-- Python 3.13 users may see this more frequently due to how newer Python versions resolve dependencies
+- **Python 3.13+ is not supported** - use Python 3.10, 3.11, or 3.12 instead
 - This issue affects any project using `nemo-toolkit[tts]>=2.5.0` with older ml_dtypes
 
 ## Prevention

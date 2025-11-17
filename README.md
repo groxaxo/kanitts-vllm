@@ -34,15 +34,15 @@ KaniTTS-vLLM is a revolutionary text-to-speech system optimized for minimal GPU 
 
 ### Prerequisites
 - Linux system
-- Python 3.10-3.12
+- **Python 3.10, 3.11, or 3.12** (Python 3.13+ is not supported due to dependency conflicts)
 - NVIDIA GPU with CUDA 12.8+
 - **Only 2GB VRAM required!**
 
 ### Installation (5 minutes)
 
 ```bash
-# 1. Install system dependencies
-sudo apt install python3.10 python3.10-venv curl git ffmpeg
+# 1. Install system dependencies (with Python 3.10, 3.11, or 3.12)
+sudo apt install python3.12 python3.12-venv curl git ffmpeg
 
 # 2. Install uv (fast package manager)
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -51,7 +51,7 @@ source $HOME/.local/bin/env
 # 3. Clone and setup
 git clone https://github.com/groxaxo/kanitts-vllm.git
 cd kanitts-vllm
-uv venv && source .venv/bin/activate
+uv venv --python 3.12 && source .venv/bin/activate
 
 # 4. Install dependencies
 uv pip install -r requirements.txt
