@@ -7,11 +7,12 @@ KaniTTS-vLLM is optimized to run on **just 2GB VRAM** while delivering real-time
 ### Important: Dependency Version Compatibility
 
 This project requires specific versions of dependencies to ensure compatibility:
-- **transformers==4.52.0** (required by both vllm and nemo-toolkit)
-- **vllm==0.9.0** (compatible with transformers 4.52.0)
-- **nemo-toolkit[tts]==2.4.0** (requires transformers<=4.52.0 and numpy<2.0.0)
-- **bitsandbytes==0.45.5** (required by nemo-toolkit)
+- **transformers==4.53.2** (required by both vllm and nemo-toolkit)
+- **vllm==0.10.0** (compatible with transformers 4.53.2)
+- **nemo-toolkit[tts]==2.5.3** (requires transformers~=4.53.0 and numpy<2.0.0)
+- **bitsandbytes==0.46.0** (required by nemo-toolkit)
 - **numpy<2.0.0** (required by nemo-toolkit)
+- **ml_dtypes>=0.5.0** (required by onnx for float4_e2m1fn type support)
 
 The installation process installs these dependencies in the correct order to avoid conflicts.
 
@@ -99,12 +100,12 @@ source venv/bin/activate
 pip install --upgrade pip
 
 # Install dependencies in correct order to avoid conflicts
-pip install "transformers==4.52.0"
-pip install "torch>=2.1.0" "numpy>=1.24.0,<2.0.0" "scipy>=1.11.0"
-pip install "bitsandbytes==0.45.5"
+pip install "transformers==4.53.2"
+pip install "torch>=2.1.0" "numpy>=1.24.0,<2.0.0" "scipy>=1.11.0" "ml_dtypes>=0.5.0"
+pip install "bitsandbytes==0.46.0"
 pip install "fastapi>=0.104.0" "uvicorn[standard]>=0.24.0"
-pip install "nemo-toolkit[tts]==2.4.0"
-pip install "vllm==0.9.0"
+pip install "nemo-toolkit[tts]==2.5.3"
+pip install "vllm==0.10.0"
 pip install "pydantic>=2.0.0" "langdetect>=1.0.9"
 ```
 
@@ -128,9 +129,9 @@ generator = VLLMTTSGenerator(
 
 If you encounter dependency conflict errors during installation:
 
-1. **Error: "Cannot install nemo-toolkit[tts]==2.4.0 and transformers==X.Y.Z"**
+1. **Error: "Cannot install nemo-toolkit[tts]==2.5.3 and transformers==X.Y.Z"**
    - This project requires specific compatible versions
-   - Make sure you're using `transformers==4.52.0`, `vllm==0.9.0`, and `bitsandbytes==0.45.5`
+   - Make sure you're using `transformers==4.53.2`, `vllm==0.10.0`, and `bitsandbytes==0.46.0`
    - Delete your virtual environment and reinstall: `rm -rf venv && python3.10 -m venv venv`
 
 2. **Error: "ResolutionImpossible: for help visit..."**
@@ -139,9 +140,15 @@ If you encounter dependency conflict errors during installation:
    - Alternatively, follow the manual installation steps exactly as shown
 
 3. **Wrong package versions installed**
-   - Check installed versions: `pip list | grep -E "(transformers|vllm|nemo-toolkit|bitsandbytes)"`
-   - Should show: transformers==4.52.0, vllm==0.9.0, nemo-toolkit==2.4.0, bitsandbytes==0.45.5
+   - Check installed versions: `pip list | grep -E "(transformers|vllm|nemo-toolkit|bitsandbytes|ml.dtypes)"`
+   - Should show: transformers==4.53.2, vllm==0.10.0, nemo-toolkit==2.5.3, bitsandbytes==0.46.0, ml_dtypes>=0.5.0
    - If not, reinstall with: `pip install --force-reinstall -r requirements.txt`
+
+4. **Error: "AttributeError: module 'ml_dtypes' has no attribute 'float4_e2m1fn'"**
+   - This error occurs when ml_dtypes is too old (< 0.5.0)
+   - The onnx package (used by nemo-toolkit) requires ml_dtypes>=0.5.0
+   - Upgrade ml_dtypes: `pip install --upgrade 'ml_dtypes>=0.5.0'`
+   - Or reinstall all dependencies: `pip install --force-reinstall -r requirements.txt`
 
 ### Out of Memory Errors
 

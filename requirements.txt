@@ -10,6 +10,10 @@ torch>=2.1.0
 numpy>=1.24.0,<2.0.0
 scipy>=1.11.0
 
+# ml_dtypes: Required by onnx>=1.17.0 for float4_e2m1fn type support
+# Must be >=0.5.0 to avoid AttributeError with onnx 1.19.0
+ml_dtypes>=0.5.0
+
 # BitsAndBytes for 4-bit quantization (required by nemo-toolkit)
 bitsandbytes==0.46.0
 
