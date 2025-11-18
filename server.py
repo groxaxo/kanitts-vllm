@@ -141,6 +141,8 @@ async def openai_speech(request: OpenAISpeechRequest):
     - Routes to appropriate English or Spanish model
     - Uses language-specific voice preferences
     """
+    global generator, player  # Declare global variables
+    
     # Check initialization based on mode
     if MULTI_LANGUAGE_MODE:
         if not multi_language_generator:
@@ -419,9 +421,11 @@ async def openai_speech(request: OpenAISpeechRequest):
                     }
                 )
             else:  # wav
-                # Convert to WAV bytes
+                # Convert to WAV bytes (convert float to int16)
                 wav_buffer = io.BytesIO()
-                wav_write(wav_buffer, 22050, full_audio)
+                # Convert float audio to int16 PCM
+                pcm_audio = (full_audio * 32767).astype(np.int16)
+                wav_write(wav_buffer, 22050, pcm_audio)
                 wav_buffer.seek(0)
 
                 return Response(
