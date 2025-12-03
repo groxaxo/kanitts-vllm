@@ -81,8 +81,11 @@ async def startup_event():
         }
         
         if not enabled_language_models:
-            raise ValueError(f"No valid languages in ENABLED_LANGUAGES: {ENABLED_LANGUAGES}. "
-                           f"Available languages: {list(LANGUAGE_MODELS.keys())}")
+            raise ValueError(
+                f"No valid languages in ENABLED_LANGUAGES: {ENABLED_LANGUAGES}. "
+                f"Available languages: {list(LANGUAGE_MODELS.keys())}. "
+                f"Use ENABLED_LANGUAGES = [\"en\"] or [\"es\"] or [\"en\", \"es\"] in config.py"
+            )
         
         # Initialize multi-language generator with selected language models
         languages_str = ", ".join(enabled_language_models.keys())
