@@ -101,13 +101,13 @@ def get_performance_config(mode):
     configs = {
         "low_vram": {
             "gpu_memory_utilization": 0.15,
-            "max_model_len": 512,
+            "max_model_len": 1536,  # Must be >= MAX_TOKENS (1200) + prompt tokens (~300)
             "quantization": None,
             "precision": "bfloat16"
         },
         "balanced": {
             "gpu_memory_utilization": 0.5,
-            "max_model_len": 1024,
+            "max_model_len": 1536,  # Must be >= MAX_TOKENS (1200) + prompt tokens (~300)
             "quantization": None,
             "precision": "bfloat16"
         },
@@ -119,7 +119,7 @@ def get_performance_config(mode):
         },
         "bnb_4bit": {
             "gpu_memory_utilization": 0.3,
-            "max_model_len": 1024,
+            "max_model_len": 1536,  # Must be >= MAX_TOKENS (1200) + prompt tokens (~300)
             "quantization": "bitsandbytes",
             "precision": "bfloat16"
         }
