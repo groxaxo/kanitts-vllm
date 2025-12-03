@@ -17,7 +17,8 @@ from generation.multi_language_generator import MultiLanguageGenerator
 from config import (CHUNK_SIZE, LOOKBACK_FRAMES, TEMPERATURE, TOP_P, MAX_TOKENS, 
                     LONG_FORM_THRESHOLD_SECONDS, LONG_FORM_SILENCE_DURATION, 
                     LONG_FORM_CHUNK_DURATION, PERFORMANCE_CONFIG, PERFORMANCE_MODE,
-                    MULTI_LANGUAGE_MODE, LANGUAGE_MODELS, VOICE_PREFERENCES)
+                    MULTI_LANGUAGE_MODE, LANGUAGE_MODELS, VOICE_PREFERENCES,
+                    ENABLED_LANGUAGES)
 
 from nemo.utils.nemo_logging import Logger
 
@@ -73,12 +74,26 @@ async def startup_event():
     print(f"📊 Configuration: {PERFORMANCE_CONFIG}")
 
     if MULTI_LANGUAGE_MODE:
-        # Initialize multi-language generator with both English and Spanish models
-        print("🌍 Multi-language mode enabled - initializing English and Spanish models...")
+        # Filter LANGUAGE_MODELS to only include enabled languages
+        enabled_language_models = {
+            lang: config for lang, config in LANGUAGE_MODELS.items() 
+            if lang in ENABLED_LANGUAGES
+        }
+        
+        if not enabled_language_models:
+            raise ValueError(
+                f"No valid languages in ENABLED_LANGUAGES: {ENABLED_LANGUAGES}. "
+                f"Available languages: {list(LANGUAGE_MODELS.keys())}. "
+                f"Use ENABLED_LANGUAGES = [\"en\"] or [\"es\"] or [\"en\", \"es\"] in config.py"
+            )
+        
+        # Initialize multi-language generator with selected language models
+        languages_str = ", ".join(enabled_language_models.keys())
+        print(f"🌍 Multi-language mode enabled - initializing {languages_str} model(s)...")
         print(f"📝 Voice preferences: {VOICE_PREFERENCES}")
         
         multi_language_generator = MultiLanguageGenerator(
-            language_configs=LANGUAGE_MODELS,
+            language_configs=enabled_language_models,
             voice_preferences=VOICE_PREFERENCES,
             tensor_parallel_size=1,
             gpu_memory_utilization=PERFORMANCE_CONFIG["gpu_memory_utilization"],
@@ -87,10 +102,10 @@ async def startup_event():
             dtype=PERFORMANCE_CONFIG["precision"]
         )
         
-        # Initialize all language models
+        # Initialize enabled language models
         await multi_language_generator.initialize_all_languages()
         
-        print(f"✅ Multi-language TTS initialized successfully with {len(LANGUAGE_MODELS)} languages!")
+        print(f"✅ Multi-language TTS initialized successfully with {len(enabled_language_models)} language(s)!")
     else:
         # Single language mode (legacy behavior)
         print("🔤 Single language mode - initializing default model...")

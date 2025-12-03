@@ -45,8 +45,15 @@ MODEL_NAME = "nineninesix/kani-tts-400m-en"
 CODEC_MODEL_NAME = "nvidia/nemo-nano-codec-22khz-0.6kbps-12.5fps"
 
 # Multi-Language Configuration
-# Enable dual-language mode to run both English and Spanish models in parallel
+# Enable multi-language mode to run selected language models
 MULTI_LANGUAGE_MODE = True  # Set to False to use single language (MODEL_NAME above)
+
+# Select which languages to load in multi-language mode
+# Options:
+#   ["en", "es"] - Load both English and Spanish (default, requires ~4GB VRAM)
+#   ["en"]       - Load only English (~2GB VRAM)
+#   ["es"]       - Load only Spanish (~2GB VRAM)
+ENABLED_LANGUAGES = ["en", "es"]
 
 # Language-specific model configurations
 LANGUAGE_MODELS = {

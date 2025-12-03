@@ -131,9 +131,23 @@ class MultiLanguageGenerator:
             text: Input text to analyze
             
         Returns:
-            Language code for routing
+            Language code for routing (must be an initialized language)
+            
+        Raises:
+            ValueError: If no languages are initialized
         """
         detected_language = self.language_detector.detect_language(text)
+        
+        # If detected language is not initialized, use the first available language
+        if detected_language not in self.generators:
+            available_languages = list(self.generators.keys())
+            if not available_languages:
+                raise ValueError("No languages initialized. Check ENABLED_LANGUAGES in config.py")
+            fallback_language = available_languages[0]
+            print(f"[MultiLanguageGenerator] Detected '{detected_language}' but not initialized, "
+                  f"falling back to '{fallback_language}'")
+            return fallback_language
+        
         print(f"[MultiLanguageGenerator] Detected language: {detected_language}")
         return detected_language
     

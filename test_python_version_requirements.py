@@ -111,7 +111,6 @@ def test_documentation():
     docs_to_check = {
         'README.md': ['Python 3.10, 3.11, or 3.12', 'Python 3.13'],
         'INSTALL.md': ['Python 3.13', 'numpy<2.0.0'],
-        'TROUBLESHOOTING_ML_DTYPES.md': ['Python 3.13', 'numpy>=2.1.0'],
     }
     
     all_ok = True

@@ -221,7 +221,7 @@ KaniTTS-vLLM supports multiple languages with **automatic language detection** a
 
 #### Features:
 - 🔍 **Automatic Language Detection**: Detects English vs Spanish automatically
-- 🚀 **Parallel Execution**: Both models loaded and ready simultaneously
+- 🚀 **Flexible Language Selection**: Load both languages or just one
 - 🎤 **Voice Preferences**: Configure preferred voices for each language
 - 🎯 **Seamless Routing**: Text automatically sent to the correct model
 
@@ -232,6 +232,13 @@ Edit `config.py` to customize multi-language settings:
 ```python
 # Enable/disable multi-language mode
 MULTI_LANGUAGE_MODE = True  # Default: True
+
+# Select which languages to load
+# Options:
+#   ["en", "es"] - Load both English and Spanish (default, ~4GB VRAM)
+#   ["en"]       - Load only English (~2GB VRAM)
+#   ["es"]       - Load only Spanish (~2GB VRAM)
+ENABLED_LANGUAGES = ["en", "es"]
 
 # Voice preferences for each language
 VOICE_PREFERENCES = {
@@ -625,7 +632,13 @@ curl -X POST http://localhost:8000/v1/audio/speech \
 pip install --upgrade 'ml_dtypes>=0.5.0'
 ```
 
-This error occurs when ml_dtypes is too old (< 0.5.0). The onnx package requires ml_dtypes>=0.5.0 for the float4_e2m1fn type. See [TROUBLESHOOTING_ML_DTYPES.md](TROUBLESHOOTING_ML_DTYPES.md) for detailed information.
+This error occurs when ml_dtypes is too old (< 0.5.0). The onnx package requires ml_dtypes>=0.5.0 for the float4_e2m1fn type.
+
+If upgrading doesn't work, try a clean reinstall:
+```bash
+pip uninstall ml_dtypes onnx nemo-toolkit -y
+pip install -r requirements.txt
+```
 
 ### Out of Memory (OOM)
 
