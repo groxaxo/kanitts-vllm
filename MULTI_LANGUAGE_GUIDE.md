@@ -45,6 +45,13 @@ All configuration is in `config.py`:
 # Enable/disable multi-language mode
 MULTI_LANGUAGE_MODE = True  # Default: True for multi-language support
 
+# Select which languages to load in multi-language mode
+# Options:
+#   ["en", "es"] - Load both English and Spanish (default, ~4GB VRAM)
+#   ["en"]       - Load only English (~2GB VRAM)
+#   ["es"]       - Load only Spanish (~2GB VRAM)
+ENABLED_LANGUAGES = ["en", "es"]
+
 # Language-specific model configurations
 LANGUAGE_MODELS = {
     "en": {
@@ -168,18 +175,25 @@ Example:
 
 ## VRAM Requirements
 
-Multi-language mode loads both models simultaneously:
+VRAM usage depends on which languages you enable:
 
-| Mode | Configuration | VRAM Usage | Notes |
-|------|--------------|------------|-------|
-| Single | Low VRAM | ~2GB | One model loaded |
-| Multi | Low VRAM | ~4GB | Both EN + ES models |
-| Single | Balanced | ~6GB | One model loaded |
-| Multi | Balanced | ~12GB | Both EN + ES models |
-| Single | High Perf | ~16GB | One model loaded |
-| Multi | High Perf | ~32GB | Both EN + ES models |
+| Languages Enabled | Configuration | VRAM Usage | Notes |
+|------------------|--------------|------------|-------|
+| One language (`["en"]` or `["es"]`) | Low VRAM | ~2GB | Single model loaded |
+| Both languages (`["en", "es"]`) | Low VRAM | ~4GB | Both EN + ES models |
+| One language | Balanced | ~6GB | Single model loaded |
+| Both languages | Balanced | ~12GB | Both EN + ES models |
+| One language | High Perf | ~16GB | Single model loaded |
+| Both languages | High Perf | ~32GB | Both EN + ES models |
 
-**Recommendation**: For GPUs with less than 6GB VRAM, consider using single-language mode:
+**Recommendation**: For GPUs with less than 6GB VRAM, enable only one language:
+```python
+# config.py
+MULTI_LANGUAGE_MODE = True
+ENABLED_LANGUAGES = ["en"]  # or ["es"] for Spanish only
+```
+
+Or use single-language mode:
 ```python
 # config.py
 MULTI_LANGUAGE_MODE = False

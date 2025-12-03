@@ -44,6 +44,10 @@ Key settings:
 # Enable/disable multi-language (default: True)
 MULTI_LANGUAGE_MODE = True
 
+# Select which languages to load (default: both)
+# Use ["en"] for English only, ["es"] for Spanish only
+ENABLED_LANGUAGES = ["en", "es"]
+
 # Set voice preferences
 VOICE_PREFERENCES = {
     "en": "andrew",  # English: andrew or katie
@@ -133,23 +137,25 @@ python example_multi_language.py
 
 | GPU | Mode | VRAM | Languages |
 |-----|------|------|-----------|
+| RTX 3060 | Low VRAM | 2GB | EN only or ES only |
 | RTX 3060 | Low VRAM | 4GB | EN + ES |
 | RTX 4060 | Balanced | 12GB | EN + ES |
 | RTX 5090 | High Perf | 32GB | EN + ES |
 
-**Note**: Single-language mode uses ~50% less VRAM.
+**Note**: Single-language (`ENABLED_LANGUAGES = ["en"]` or `["es"]`) uses ~50% less VRAM.
 
 ## Common Issues
 
 ### "Out of Memory"
 
-**Solution**: Reduce VRAM usage or use single-language mode:
+**Solution**: Reduce VRAM usage by enabling only one language:
 
 ```python
 # config.py
 PERFORMANCE_MODE = "low_vram"  # Use lowest VRAM mode
+ENABLED_LANGUAGES = ["en"]     # Load only English (~2GB)
 
-# OR disable multi-language
+# OR disable multi-language mode entirely
 MULTI_LANGUAGE_MODE = False
 MODEL_NAME = "nineninesix/kani-tts-400m-en"
 ```
