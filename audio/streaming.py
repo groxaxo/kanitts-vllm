@@ -33,6 +33,10 @@ class StreamingAudioWriter:
         self.audio_token_buffer = []
         self.all_tokens = []  # Store all audio tokens for sliding window decoding
         self.frames_decoded = 0  # Track how many frames we've already output
+        
+        # Silence detection
+        self.silence_counter = 0.0
+        self.stop_signal = False
 
     def decoder_worker(self):
         """Background thread that decodes audio chunks as they arrive"""
@@ -116,6 +120,27 @@ class StreamingAudioWriter:
 
                             self.audio_chunks.append(new_audio)
                             self.frames_decoded += self.chunk_size
+                            
+                            # SILENCE DETECTION (Fix for infinite generation/gibberish)
+                            # Calculate RMS amplitude of the new audio
+                            if len(new_audio) > 0:
+                                # Convert float audio to int16 range for RMS check if needed, 
+                                # but usually player.decode_audio_chunk returns float [-1, 1] or int16.
+                                # Let's assume float [-1, 1] based on standard vocoders, or check type.
+                                # If it's int16, range is different. vllm_generator.py casts to int16 later ( * 32767).
+                                # So here it is likely float.
+                                rms = np.sqrt(np.mean(new_audio**2))
+                                
+                                # Threshold: 0.01 (1%) is conservative for silence
+                                if rms < 0.01:
+                                    self.silence_counter += (len(new_audio) / self.sample_rate)
+                                else:
+                                    self.silence_counter = 0
+                                
+                                # Stop if silence > 1.5 seconds
+                                if self.silence_counter > 1.5:
+                                    print(f"xx Silence limit reached ({self.silence_counter:.2f}s). Signaling stop.")
+                                    self.stop_signal = True
 
                         # Clear buffer (we've stored everything in all_tokens)
                         self.audio_token_buffer = []

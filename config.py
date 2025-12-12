@@ -36,6 +36,24 @@ LONG_FORM_CHUNK_DURATION = 12.0     # Target duration per chunk (stay within 5-1
 LONG_FORM_SILENCE_DURATION = 0.2    # Silence between chunks in seconds
 
 
-# Model paths
-MODEL_NAME = "nineninesix/kani-tts-400m-en"
+# Multi-Language Configuration
+# Set DEFAULT_LANGUAGE to "es" for Spanish or "en" for English
+DEFAULT_LANGUAGE = "es"  # Spanish is default
+
+# Language-specific model configurations
+LANGUAGE_MODELS = {
+    "en": {
+        "model": "nineninesix/kani-tts-400m-en",
+        "voices": ["andrew", "katie"],  # English voices
+        "description": "English TTS"
+    },
+    "es": {
+        "model": "nineninesix/kani-tts-400m-es",
+        "voices": ["nova", "ballad", "ash"],  # Spanish voices
+        "description": "Spanish TTS"
+    }
+}
+
+# Default model (will be overridden by language selection in API)
+MODEL_NAME = LANGUAGE_MODELS[DEFAULT_LANGUAGE]["model"]
 CODEC_MODEL_NAME = "nvidia/nemo-nano-codec-22khz-0.6kbps-12.5fps"

@@ -9,29 +9,33 @@ from vllm.inputs import TokensPrompt
 from transformers import AutoTokenizer
 
 from config import (
-    MODEL_NAME, START_OF_HUMAN, END_OF_TEXT, END_OF_HUMAN, END_OF_AI,
+    MODEL_NAME, START_OF_HUMAN, END_OF_TEXT, END_OF_HUMAN, END_OF_AI, START_OF_AI, END_OF_SPEECH, START_OF_SPEECH,
+    START_OF_TEXT,
     TEMPERATURE, TOP_P, REPETITION_PENALTY, MAX_TOKENS, SAMPLE_RATE
 )
 
 
 class VLLMTTSGenerator:
-    def __init__(self, tensor_parallel_size=1, gpu_memory_utilization=0.9, max_model_len=2048):
+    def __init__(self, model_name=None, tensor_parallel_size=1, gpu_memory_utilization=0.9, max_model_len=2048):
         """Initialize VLLM-based TTS generator with async streaming support
 
         Args:
+            model_name: Model name/path to use (defaults to MODEL_NAME from config)
             tensor_parallel_size: Number of GPUs to use for tensor parallelism
             gpu_memory_utilization: Fraction of GPU memory to use (0.0 to 1.0)
             max_model_len: Maximum sequence length
         """
-        print(f"Loading VLLM AsyncLLMEngine model: {MODEL_NAME}")
+        # Use provided model_name or default from config
+        self.model_name = model_name or MODEL_NAME
+        print(f"Loading VLLM AsyncLLMEngine model: {self.model_name}")
 
         # Configure engine arguments
         engine_args = AsyncEngineArgs(
-            model=MODEL_NAME,
+            model=self.model_name,
             tensor_parallel_size=tensor_parallel_size,
             max_model_len=max_model_len,
             gpu_memory_utilization=gpu_memory_utilization,
-            enforce_eager=False,  # Allow CUDA graphs (reduces kernel launch overhead)
+            enforce_eager=True,  # Disable CUDA graphs to avoid compilation issues
             max_num_seqs=1,  # Single sequence for TTS - enables better CUDA graph optimization
             dtype="bfloat16",  # BF16 for faster inference on RTX 5090
         )
@@ -40,7 +44,7 @@ class VLLMTTSGenerator:
         self.engine = None  # Will be initialized in async context
         self.engine_args = engine_args
 
-        self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
 
         # Pre-configure sampling parameters
         self.sampling_params = SamplingParams(
@@ -48,7 +52,7 @@ class VLLMTTSGenerator:
             top_p=TOP_P,
             max_tokens=MAX_TOKENS,
             repetition_penalty=REPETITION_PENALTY,
-            stop_token_ids=[END_OF_AI],
+            stop_token_ids=[END_OF_AI, END_OF_SPEECH, END_OF_TEXT],
         )
 
     async def initialize_engine(self):
@@ -60,12 +64,15 @@ class VLLMTTSGenerator:
 
     def prepare_input(self, prompt):
         """Build custom input_ids with special tokens"""
-        input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids
+        # FIX: AutoTokenizer adds BOS by default (ID 1). We add it manually later, so disable it here
+        # to prevent double BOS (which causes hallucinations/gibberish).
+        input_ids = self.tokenizer(prompt, add_special_tokens=False, return_tensors="pt").input_ids
 
-        # Add special tokens: [START_OF_HUMAN] + input_ids + [END_OF_TEXT, END_OF_HUMAN]
-        start_token = torch.tensor([[START_OF_HUMAN]], dtype=torch.int64)
-        end_tokens = torch.tensor([[END_OF_TEXT, END_OF_HUMAN]], dtype=torch.int64)
-        modified_input_ids = torch.cat([start_token, input_ids, end_tokens], dim=1)
+        # Add special tokens: [START_OF_TEXT] + input_ids + [END_OF_TEXT] + [START_OF_SPEECH]
+        start_token = torch.tensor([[START_OF_TEXT]], dtype=torch.int64)
+        end_token = torch.tensor([[END_OF_TEXT]], dtype=torch.int64)
+        start_speech_token = torch.tensor([[START_OF_SPEECH]], dtype=torch.int64)
+        modified_input_ids = torch.cat([start_token, input_ids, end_token, start_speech_token], dim=1)
 
         # Convert to list for VLLM
         return modified_input_ids[0].tolist()
@@ -97,7 +104,7 @@ class VLLMTTSGenerator:
                 top_p=TOP_P,
                 max_tokens=max_tokens,
                 repetition_penalty=REPETITION_PENALTY,
-                stop_token_ids=[END_OF_AI],
+                stop_token_ids=[END_OF_AI, END_OF_SPEECH, END_OF_TEXT],
             )
         else:
             sampling_params = self.sampling_params
@@ -116,6 +123,11 @@ class VLLMTTSGenerator:
             sampling_params,
             request_id=request_id
         )
+
+        # FIX: The prompt ends with START_OF_SPEECH, so the model continues from there.
+        # We need to tell the audio writer that speech has started.
+        audio_writer.add_token(START_OF_SPEECH)
+        inside_speech = True
 
         async for request_output in results_generator:
             # Get newly generated tokens
@@ -139,6 +151,13 @@ class VLLMTTSGenerator:
                         inside_speech = False
                     elif inside_speech:
                         audio_token_count += 1
+            
+            # Check for silence stop signal
+            if audio_writer.stop_signal:
+                print(f"[VLLM] processing stopped due to silence detection.")
+                # We should stop the VLLM engine for this request
+                await self.engine.abort(request_id)
+                break
 
         point_2 = time.time()
         generation_time = point_2 - point_1
@@ -161,6 +180,11 @@ class VLLMTTSGenerator:
         print(f"\n[VLLM] Generation complete. Prompt tokens: {prompt_tokens}, Generated tokens: {generated_tokens}, Total: {total_tokens}")
         print(f"       Audio tokens: {audio_token_count}, Frames: {num_frames}, Audio duration: {audio_duration:.2f}s")
         print(f"       Generation time: {generation_time:.2f}s, RTF: {rtf:.3f}")
+
+        # DEBUG: Print first/last tokens
+        if len(all_token_ids) > 0:
+            print(f"DEBUG: First 20 tokens: {all_token_ids[:20]}")
+            print(f"DEBUG: Last 20 tokens: {all_token_ids[-20:]}")
 
         # OPTIMIZATION: Skip text decoding - it's slow and not needed for TTS
 
