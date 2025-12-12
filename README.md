@@ -119,7 +119,7 @@ curl -X POST http://localhost:8000/v1/audio/speech \
   --output speech.wav
 ```
 
-### Generate Speech (Streaming)
+### Generate Speech (Streaming SSE)
 
 ```bash
 curl -X POST http://localhost:8000/v1/audio/speech \
@@ -129,6 +129,19 @@ curl -X POST http://localhost:8000/v1/audio/speech \
     "voice": "katie",
     "stream_format": "sse"
   }'
+```
+
+### Generate Speech (Raw PCM Streaming for Open-WebUI)
+
+```bash
+curl -X POST http://localhost:8000/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": "This streams raw PCM audio directly.",
+    "voice": "andrew",
+    "stream_format": "audio"
+  }' \
+  --output speech.pcm
 ```
 
 Check out [https://github.com/nineninesix-ai/open-audio](https://github.com/nineninesix-ai/open-audio) for NextJS implementation
@@ -170,7 +183,7 @@ Example voices for English:
 
 **Streaming (stream_format)**:
 - `sse` - Server-Sent Events with base64-encoded audio chunks
-- `audio` - Raw audio streaming
+- `audio` - Raw PCM audio streaming (for open-webui compatibility)
 
 #### Streaming Event Format (SSE)
 
