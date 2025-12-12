@@ -13,7 +13,7 @@ import json
 
 from audio import LLMAudioPlayer, StreamingAudioWriter
 from generation.vllm_generator import VLLMTTSGenerator
-from config import CHUNK_SIZE, LOOKBACK_FRAMES, TEMPERATURE, TOP_P, MAX_TOKENS, LONG_FORM_THRESHOLD_SECONDS, LONG_FORM_SILENCE_DURATION, LONG_FORM_CHUNK_DURATION
+from config import CHUNK_SIZE, LOOKBACK_FRAMES, TEMPERATURE, TOP_P, MAX_TOKENS, LONG_FORM_THRESHOLD_SECONDS, LONG_FORM_SILENCE_DURATION, LONG_FORM_CHUNK_DURATION, SAMPLE_RATE
 
 from nemo.utils.nemo_logging import Logger
 
@@ -166,7 +166,7 @@ async def openai_speech(request: OpenAISpeechRequest):
 
                             # Add silence between chunks (except after last chunk)
                             if i < total_chunks - 1:
-                                silence_samples = int((request.silence_duration or LONG_FORM_SILENCE_DURATION) * 22050)
+                                silence_samples = int((request.silence_duration or LONG_FORM_SILENCE_DURATION) * SAMPLE_RATE)
                                 silence = np.zeros(silence_samples, dtype=np.float32)
                                 chunk_queue.put(("chunk", silence))
 
@@ -331,7 +331,7 @@ async def openai_speech(request: OpenAISpeechRequest):
 
                             # Add silence between chunks (except after last chunk)
                             if i < total_chunks - 1:
-                                silence_samples = int((request.silence_duration or LONG_FORM_SILENCE_DURATION) * 22050)
+                                silence_samples = int((request.silence_duration or LONG_FORM_SILENCE_DURATION) * SAMPLE_RATE)
                                 silence = np.zeros(silence_samples, dtype=np.float32)
                                 chunk_queue.put(("chunk", silence))
 
@@ -412,7 +412,7 @@ async def openai_speech(request: OpenAISpeechRequest):
             media_type="audio/pcm",
             headers={
                 "Content-Type": "audio/pcm",
-                "X-Sample-Rate": "22050",
+                "X-Sample-Rate": str(SAMPLE_RATE),
                 "X-Channels": "1",
                 "X-Bit-Depth": "16",
                 "Cache-Control": "no-cache",
@@ -480,7 +480,7 @@ async def openai_speech(request: OpenAISpeechRequest):
                     media_type="application/octet-stream",
                     headers={
                         "Content-Type": "application/octet-stream",
-                        "X-Sample-Rate": "22050",
+                        "X-Sample-Rate": str(SAMPLE_RATE),
                         "X-Channels": "1",
                         "X-Bit-Depth": "16"
                     }
@@ -488,7 +488,7 @@ async def openai_speech(request: OpenAISpeechRequest):
             else:  # wav
                 # Convert to WAV bytes
                 wav_buffer = io.BytesIO()
-                wav_write(wav_buffer, 22050, full_audio)
+                wav_write(wav_buffer, SAMPLE_RATE, full_audio)
                 wav_buffer.seek(0)
 
                 return Response(
