@@ -89,8 +89,18 @@ async def startup_event():
         
         # Initialize multi-language generator with selected language models
         languages_str = ", ".join(enabled_language_models.keys())
-        print(f"🌍 Multi-language mode enabled - initializing {languages_str} model(s)...")
+        num_langs = len(enabled_language_models)
+        
+        print(f"🌍 Multi-language mode enabled - loading {num_langs} language(s): {languages_str.upper()}")
+        
+        if num_langs > 1:
+            print(f"🤖 Language auto-detection: ENABLED")
+            print(f"   Text will be automatically routed to the appropriate model")
+        else:
+            print(f"🤖 Language auto-detection: DISABLED (single language mode)")
+        
         print(f"📝 Voice preferences: {VOICE_PREFERENCES}")
+        print(f"💾 Estimated VRAM usage: ~{num_langs * 2}GB")
         
         multi_language_generator = MultiLanguageGenerator(
             language_configs=enabled_language_models,
@@ -105,10 +115,14 @@ async def startup_event():
         # Initialize enabled language models
         await multi_language_generator.initialize_all_languages()
         
-        print(f"✅ Multi-language TTS initialized successfully with {len(enabled_language_models)} language(s)!")
+        auto_detect_msg = " with auto-detection" if num_langs > 1 else ""
+        print(f"✅ Multi-language TTS initialized successfully{auto_detect_msg}!")
+        print(f"🎭 Available voices: {', '.join([v for config in enabled_language_models.values() for v in config['available_voices']])}")
     else:
         # Single language mode (legacy behavior)
-        print("🔤 Single language mode - initializing default model...")
+        print("🔤 Single language mode (legacy) - initializing default model...")
+        print(f"📦 Model: {MODEL_NAME}")
+        print(f"💾 Estimated VRAM usage: ~2GB")
         
         generator = VLLMTTSGenerator(
             tensor_parallel_size=1,
@@ -122,7 +136,7 @@ async def startup_event():
         await generator.initialize_engine()
 
         player = LLMAudioPlayer(generator.tokenizer)
-        print(f"✅ VLLM TTS models initialized successfully in '{PERFORMANCE_MODE}' mode!")
+        print(f"✅ TTS initialized successfully in '{PERFORMANCE_MODE}' mode!")
 
 
 @app.get("/health")

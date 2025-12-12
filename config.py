@@ -36,26 +36,54 @@ LONG_FORM_CHUNK_DURATION = 12.0     # Target duration per chunk (stay within 5-1
 LONG_FORM_SILENCE_DURATION = 0.2    # Silence between chunks in seconds
 
 
-# Model paths
-# Change MODEL_NAME to use a different language:
+# ============================================================================
+# LANGUAGE CONFIGURATION - Choose Your Deployment Mode
+# ============================================================================
+#
+# KaniTTS-vLLM supports flexible language deployment:
+#
+# 🌍 OPTION 1: Both Languages with Auto-Detection (Recommended for Open-WebUI)
+#    - MULTI_LANGUAGE_MODE = True
+#    - ENABLED_LANGUAGES = ["en", "es"]
+#    - VRAM Required: ~4GB
+#    - Features: Automatic language detection, all voices available
+#
+# 🇬🇧 OPTION 2: English Only
+#    - MULTI_LANGUAGE_MODE = True
+#    - ENABLED_LANGUAGES = ["en"]
+#    - VRAM Required: ~2GB
+#    - Voices: andrew, katie
+#
+# 🇪🇸 OPTION 3: Spanish Only
+#    - MULTI_LANGUAGE_MODE = True
+#    - ENABLED_LANGUAGES = ["es"]
+#    - VRAM Required: ~2GB
+#    - Voices: nova, ballad, ash
+#
+# 📦 OPTION 4: Legacy Single Language Mode
+#    - MULTI_LANGUAGE_MODE = False
+#    - Uses MODEL_NAME setting below
+#    - VRAM Required: ~2GB
+#
+# ============================================================================
+
+# Multi-Language Mode (recommended)
+MULTI_LANGUAGE_MODE = True  # Set to False for legacy single language mode
+
+# Select which languages to load when MULTI_LANGUAGE_MODE = True
+# Change this setting to deploy English only, Spanish only, or both together
+ENABLED_LANGUAGES = ["en", "es"]  # Options: ["en"], ["es"], or ["en", "es"]
+
+# Legacy single language model path (only used when MULTI_LANGUAGE_MODE = False)
+# Options:
 # - English: "nineninesix/kani-tts-400m-en" (voices: andrew, katie)
 # - Spanish: "nineninesix/kani-tts-400m-es" (voices: nova, ballad, ash)
 # See https://huggingface.co/nineninesix for more language models
 MODEL_NAME = "nineninesix/kani-tts-400m-en"
 CODEC_MODEL_NAME = "nvidia/nemo-nano-codec-22khz-0.6kbps-12.5fps"
 
-# Multi-Language Configuration
-# Enable multi-language mode to run selected language models
-MULTI_LANGUAGE_MODE = True  # Set to False to use single language (MODEL_NAME above)
-
-# Select which languages to load in multi-language mode
-# Options:
-#   ["en", "es"] - Load both English and Spanish (default, requires ~4GB VRAM)
-#   ["en"]       - Load only English (~2GB VRAM)
-#   ["es"]       - Load only Spanish (~2GB VRAM)
-ENABLED_LANGUAGES = ["en", "es"]
-
 # Language-specific model configurations
+# These define the models and voices available for each language
 LANGUAGE_MODELS = {
     "en": {
         "model_name": "nineninesix/kani-tts-400m-en",
@@ -69,11 +97,13 @@ LANGUAGE_MODELS = {
     }
 }
 
-# User voice preferences (configurable)
-# Users can set their preferred voice for each language
+# Voice Preferences
+# When using multi-language mode with auto-detection, these are the default
+# voices used for each language when the user doesn't specify a voice or uses
+# "voice": "random" in their API request.
 VOICE_PREFERENCES = {
-    "en": "andrew",  # English voice preference
-    "es": "nova"     # Spanish voice preference
+    "en": "andrew",  # Default English voice (options: andrew, katie)
+    "es": "nova"     # Default Spanish voice (options: nova, ballad, ash)
 }
 
 # Performance Mode Configuration
