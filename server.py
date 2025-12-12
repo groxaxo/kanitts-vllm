@@ -52,7 +52,7 @@ class OpenAISpeechRequest(BaseModel):
     model: Literal["tts-1", "tts-1-hd", "gpt-4o-mini-tts"] = Field(default="tts-1", description="TTS model to use")
     voice: Literal["andrew", "katie"] = Field(default="andrew", description="Voice to use (use 'random' to omit voice prefix)")
     response_format: Literal["wav", "pcm"] = Field(default="wav", description="Audio format: wav or pcm")
-    stream_format: Optional[Literal["sse", "audio"]] = Field(default=None, description="Use 'sse' for Server-Sent Events streaming")
+    stream_format: Optional[Literal["sse", "audio"]] = Field(default=None, description="Streaming format: 'sse' for Server-Sent Events with base64 audio, 'audio' for raw PCM audio stream")
     # Long-form generation parameters
     enable_long_form: Optional[bool] = Field(default=True, description="Auto-detect and use long-form generation for texts >15s")
     max_chunk_duration: Optional[float] = Field(default=12.0, description="Max duration per chunk in long-form mode (seconds)")
@@ -92,9 +92,10 @@ async def health_check():
 async def openai_speech(request: OpenAISpeechRequest):
     """OpenAI-compatible speech generation endpoint
 
-    Supports both streaming (SSE) and non-streaming modes:
+    Supports both streaming and non-streaming modes:
     - Without stream_format: Returns complete audio file (WAV or PCM)
-    - With stream_format="sse": Returns Server-Sent Events with audio chunks
+    - With stream_format="sse": Returns Server-Sent Events with base64-encoded audio chunks
+    - With stream_format="audio": Returns raw PCM audio stream (for open-webui compatibility)
     """
     if not generator or not player:
         raise HTTPException(status_code=503, detail="TTS models not initialized")
@@ -411,7 +412,6 @@ async def openai_speech(request: OpenAISpeechRequest):
             audio_stream_generator(),
             media_type="audio/pcm",
             headers={
-                "Content-Type": "audio/pcm",
                 "X-Sample-Rate": str(SAMPLE_RATE),
                 "X-Channels": "1",
                 "X-Bit-Depth": "16",
