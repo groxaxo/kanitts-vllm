@@ -13,7 +13,7 @@ import json
 
 from audio import LLMAudioPlayer, StreamingAudioWriter
 from generation.vllm_generator import VLLMTTSGenerator
-from config import CHUNK_SIZE, LOOKBACK_FRAMES, TEMPERATURE, TOP_P, MAX_TOKENS, LONG_FORM_THRESHOLD_SECONDS, LONG_FORM_SILENCE_DURATION, LONG_FORM_CHUNK_DURATION
+from config import CHUNK_SIZE, LOOKBACK_FRAMES, TEMPERATURE, TOP_P, MAX_TOKENS, LONG_FORM_THRESHOLD_SECONDS, LONG_FORM_SILENCE_DURATION, LONG_FORM_CHUNK_DURATION, SAMPLE_RATE
 
 from nemo.utils.nemo_logging import Logger
 
@@ -52,7 +52,7 @@ class OpenAISpeechRequest(BaseModel):
     model: Literal["tts-1", "tts-1-hd", "gpt-4o-mini-tts"] = Field(default="tts-1", description="TTS model to use")
     voice: Literal["andrew", "katie"] = Field(default="andrew", description="Voice to use (use 'random' to omit voice prefix)")
     response_format: Literal["wav", "pcm"] = Field(default="wav", description="Audio format: wav or pcm")
-    stream_format: Optional[Literal["sse", "audio"]] = Field(default=None, description="Use 'sse' for Server-Sent Events streaming")
+    stream_format: Optional[Literal["sse", "audio"]] = Field(default=None, description="Streaming format: 'sse' for Server-Sent Events with base64 audio, 'audio' for raw PCM audio stream")
     # Long-form generation parameters
     enable_long_form: Optional[bool] = Field(default=True, description="Auto-detect and use long-form generation for texts >15s")
     max_chunk_duration: Optional[float] = Field(default=12.0, description="Max duration per chunk in long-form mode (seconds)")
@@ -92,9 +92,10 @@ async def health_check():
 async def openai_speech(request: OpenAISpeechRequest):
     """OpenAI-compatible speech generation endpoint
 
-    Supports both streaming (SSE) and non-streaming modes:
+    Supports both streaming and non-streaming modes:
     - Without stream_format: Returns complete audio file (WAV or PCM)
-    - With stream_format="sse": Returns Server-Sent Events with audio chunks
+    - With stream_format="sse": Returns Server-Sent Events with base64-encoded audio chunks
+    - With stream_format="audio": Returns raw PCM audio stream (for open-webui compatibility)
     """
     if not generator or not player:
         raise HTTPException(status_code=503, detail="TTS models not initialized")
@@ -166,7 +167,7 @@ async def openai_speech(request: OpenAISpeechRequest):
 
                             # Add silence between chunks (except after last chunk)
                             if i < total_chunks - 1:
-                                silence_samples = int((request.silence_duration or LONG_FORM_SILENCE_DURATION) * 22050)
+                                silence_samples = int((request.silence_duration or LONG_FORM_SILENCE_DURATION) * SAMPLE_RATE)
                                 silence = np.zeros(silence_samples, dtype=np.float32)
                                 chunk_queue.put(("chunk", silence))
 
@@ -279,6 +280,146 @@ async def openai_speech(request: OpenAISpeechRequest):
             }
         )
 
+    # Raw audio streaming mode (for open-webui compatibility)
+    elif request.stream_format == "audio":
+        async def audio_stream_generator():
+            """Generate raw PCM audio stream"""
+            import asyncio
+            import queue as thread_queue
+            from generation.chunking import estimate_duration, split_into_sentences
+
+            chunk_queue = thread_queue.Queue()
+
+            # Estimate duration to determine if we need long-form generation
+            estimated_duration = estimate_duration(request.input)
+            voice_for_generation = request.voice if request.voice != "random" else "andrew"
+            use_long_form = estimated_duration > LONG_FORM_THRESHOLD_SECONDS
+
+            if use_long_form:
+                # Long-form streaming: stream each sentence chunk as it's generated
+                print(f"[Server] Using long-form audio streaming (estimated {estimated_duration:.1f}s)")
+
+                async def generate_async_long_form():
+                    try:
+                        # Split into chunks
+                        chunks = split_into_sentences(request.input, max_duration_seconds=request.max_chunk_duration or LONG_FORM_CHUNK_DURATION)
+                        total_chunks = len(chunks)
+
+                        for i, text_chunk in enumerate(chunks):
+                            # Custom list wrapper that pushes chunks to queue
+                            class ChunkList(list):
+                                def append(self, chunk):
+                                    super().append(chunk)
+                                    chunk_queue.put(("chunk", chunk))
+
+                            audio_writer = StreamingAudioWriter(
+                                player,
+                                output_file=None,
+                                chunk_size=CHUNK_SIZE,
+                                lookback_frames=LOOKBACK_FRAMES
+                            )
+                            audio_writer.audio_chunks = ChunkList()
+                            audio_writer.start()
+
+                            # Generate with voice prefix
+                            chunk_prompt = f"{voice_for_generation}: {text_chunk}"
+                            result = await generator._generate_async(
+                                chunk_prompt,
+                                audio_writer,
+                                max_tokens=MAX_TOKENS
+                            )
+                            audio_writer.finalize()
+
+                            # Add silence between chunks (except after last chunk)
+                            if i < total_chunks - 1:
+                                silence_samples = int((request.silence_duration or LONG_FORM_SILENCE_DURATION) * SAMPLE_RATE)
+                                silence = np.zeros(silence_samples, dtype=np.float32)
+                                chunk_queue.put(("chunk", silence))
+
+                        chunk_queue.put(("done", None))
+                    except Exception as e:
+                        print(f"Generation error: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        chunk_queue.put(("error", str(e)))
+
+                gen_task = asyncio.create_task(generate_async_long_form())
+            else:
+                # Standard streaming for short texts
+                print(f"[Server] Using standard audio streaming (estimated {estimated_duration:.1f}s)")
+
+                # Custom list wrapper that pushes chunks to queue
+                class ChunkList(list):
+                    def append(self, chunk):
+                        super().append(chunk)
+                        chunk_queue.put(("chunk", chunk))
+
+                audio_writer = StreamingAudioWriter(
+                    player,
+                    output_file=None,
+                    chunk_size=CHUNK_SIZE,
+                    lookback_frames=LOOKBACK_FRAMES
+                )
+                audio_writer.audio_chunks = ChunkList()
+
+                # Start generation in background task
+                async def generate_async():
+                    try:
+                        audio_writer.start()
+                        result = await generator._generate_async(
+                            prompt_text,
+                            audio_writer,
+                            max_tokens=MAX_TOKENS
+                        )
+                        audio_writer.finalize()
+
+                        chunk_queue.put(("done", None))
+                    except Exception as e:
+                        print(f"Generation error: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        chunk_queue.put(("error", str(e)))
+
+                # Start generation as async task
+                gen_task = asyncio.create_task(generate_async())
+
+            # Stream raw PCM chunks as they arrive
+            try:
+                while True:
+                    msg_type, data = await asyncio.get_event_loop().run_in_executor(
+                        None, lambda: chunk_queue.get(timeout=30)
+                    )
+
+                    if msg_type == "chunk":
+                        # Convert numpy array to int16 PCM
+                        pcm_data = (data * 32767).astype(np.int16)
+                        # Yield raw PCM bytes directly
+                        yield pcm_data.tobytes()
+
+                    elif msg_type == "done":
+                        break
+
+                    elif msg_type == "error":
+                        # For raw audio streaming, we can't send error messages mid-stream
+                        # Just log and break
+                        print(f"Error during streaming: {data}")
+                        break
+
+            finally:
+                await gen_task
+
+        return StreamingResponse(
+            audio_stream_generator(),
+            media_type="audio/pcm",
+            headers={
+                "X-Sample-Rate": str(SAMPLE_RATE),
+                "X-Channels": "1",
+                "X-Bit-Depth": "16",
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no"
+            }
+        )
+
     # Non-streaming mode (complete audio file)
     else:
         try:
@@ -339,7 +480,7 @@ async def openai_speech(request: OpenAISpeechRequest):
                     media_type="application/octet-stream",
                     headers={
                         "Content-Type": "application/octet-stream",
-                        "X-Sample-Rate": "22050",
+                        "X-Sample-Rate": str(SAMPLE_RATE),
                         "X-Channels": "1",
                         "X-Bit-Depth": "16"
                     }
@@ -347,7 +488,7 @@ async def openai_speech(request: OpenAISpeechRequest):
             else:  # wav
                 # Convert to WAV bytes
                 wav_buffer = io.BytesIO()
-                wav_write(wav_buffer, 22050, full_audio)
+                wav_write(wav_buffer, SAMPLE_RATE, full_audio)
                 wav_buffer.seek(0)
 
                 return Response(
