@@ -3,17 +3,20 @@
 import io
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, Response
+from fastapi.responses import StreamingResponse, Response, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
 import numpy as np
 from scipy.io.wavfile import write as wav_write
 import base64
 import json
+from pathlib import Path
 
-from audio import LLMAudioPlayer, StreamingAudioWriter
+from audio import LLMAudioPlayer, StreamingAudioWriter, FlashSRUpsampler
 from generation.vllm_generator import VLLMTTSGenerator
-from config import CHUNK_SIZE, LOOKBACK_FRAMES, TEMPERATURE, TOP_P, MAX_TOKENS, LONG_FORM_THRESHOLD_SECONDS, LONG_FORM_SILENCE_DURATION, LONG_FORM_CHUNK_DURATION, SAMPLE_RATE
+from config import CHUNK_SIZE, LOOKBACK_FRAMES, TEMPERATURE, TOP_P, MAX_TOKENS, LONG_FORM_THRESHOLD_SECONDS, LONG_FORM_SILENCE_DURATION, LONG_FORM_CHUNK_DURATION, SAMPLE_RATE, ENABLE_UPSAMPLING, UPSAMPLED_SAMPLE_RATE
+from utils import normalize_text, split_text_into_sentences
 
 from nemo.utils.nemo_logging import Logger
 
@@ -22,6 +25,11 @@ nemo_logger.remove_stream_handlers()
 
 
 app = FastAPI(title="Kani TTS API", version="1.0.0")
+
+# Mount static files
+STATIC_DIR = Path(__file__).parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # Add CORS middleware to allow client.html to connect
 app.add_middleware(
@@ -35,6 +43,7 @@ app.add_middleware(
 # Global instances (initialized on startup)
 generator = None
 player = None
+upsampler = None
 
 
 class TTSRequest(BaseModel):
@@ -62,7 +71,7 @@ class OpenAISpeechRequest(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     """Initialize models on startup"""
-    global generator, player
+    global generator, player, upsampler
     print("🚀 Initializing VLLM TTS models...")
 
     # Use VLLM for faster inference
@@ -76,6 +85,15 @@ async def startup_event():
     await generator.initialize_engine()
 
     player = LLMAudioPlayer(generator.tokenizer)
+    
+    # Initialize FlashSR upsampler
+    if ENABLE_UPSAMPLING:
+        print(f"🎵 Initializing FlashSR upsampler ({SAMPLE_RATE}Hz -> {UPSAMPLED_SAMPLE_RATE}Hz)...")
+        upsampler = FlashSRUpsampler(device="cuda", enable=True, target_sr=UPSAMPLED_SAMPLE_RATE)
+        upsampler.load()
+    else:
+        upsampler = None
+        
     print("✅ VLLM TTS models initialized successfully!")
 
 
@@ -100,11 +118,14 @@ async def openai_speech(request: OpenAISpeechRequest):
     if not generator or not player:
         raise HTTPException(status_code=503, detail="TTS models not initialized")
 
+    # Normalize input text
+    normalized_text = normalize_text(request.input)
+    
     # Prepare prompt text with voice prefix (unless voice is "random")
     if request.voice == "random":
-        prompt_text = request.input
+        prompt_text = normalized_text
     else:
-        prompt_text = f"{request.voice}: {request.input}"
+        prompt_text = f"{request.voice}: {normalized_text}"
 
     # Streaming mode (SSE)
     if request.stream_format == "sse":
@@ -231,8 +252,13 @@ async def openai_speech(request: OpenAISpeechRequest):
                     )
 
                     if msg_type == "chunk":
+                        # Apply upsampling if enabled
+                        audio_chunk = data
+                        if upsampler and upsampler.enabled:
+                            audio_chunk = upsampler.upsample_chunks(audio_chunk, sample_rate=SAMPLE_RATE)
+                        
                         # Convert numpy array to int16 PCM
-                        pcm_data = (data * 32767).astype(np.int16)
+                        pcm_data = (audio_chunk * 32767).astype(np.int16)
 
                         # Encode as base64
                         audio_base64 = base64.b64encode(pcm_data.tobytes()).decode('utf-8')
@@ -391,8 +417,13 @@ async def openai_speech(request: OpenAISpeechRequest):
                     )
 
                     if msg_type == "chunk":
+                        # Apply upsampling if enabled
+                        audio_chunk = data
+                        if upsampler and upsampler.enabled:
+                            audio_chunk = upsampler.upsample_chunks(audio_chunk, sample_rate=SAMPLE_RATE)
+                        
                         # Convert numpy array to int16 PCM
-                        pcm_data = (data * 32767).astype(np.int16)
+                        pcm_data = (audio_chunk * 32767).astype(np.int16)
                         # Yield raw PCM bytes directly
                         yield pcm_data.tobytes()
 
@@ -412,7 +443,7 @@ async def openai_speech(request: OpenAISpeechRequest):
             audio_stream_generator(),
             media_type="audio/pcm",
             headers={
-                "X-Sample-Rate": str(SAMPLE_RATE),
+                "X-Sample-Rate": str(UPSAMPLED_SAMPLE_RATE if (upsampler and upsampler.enabled) else SAMPLE_RATE),
                 "X-Channels": "1",
                 "X-Bit-Depth": "16",
                 "Cache-Control": "no-cache",
@@ -471,6 +502,13 @@ async def openai_speech(request: OpenAISpeechRequest):
                 # Concatenate all chunks
                 full_audio = np.concatenate(audio_writer.audio_chunks)
 
+            # Apply upsampling if enabled
+            if upsampler and upsampler.enabled:
+                full_audio = upsampler.upsample(full_audio, sample_rate=SAMPLE_RATE)
+                output_sample_rate = UPSAMPLED_SAMPLE_RATE
+            else:
+                output_sample_rate = SAMPLE_RATE
+
             # Return based on response_format
             if request.response_format == "pcm":
                 # Return raw PCM (int16)
@@ -480,7 +518,7 @@ async def openai_speech(request: OpenAISpeechRequest):
                     media_type="application/octet-stream",
                     headers={
                         "Content-Type": "application/octet-stream",
-                        "X-Sample-Rate": str(SAMPLE_RATE),
+                        "X-Sample-Rate": str(output_sample_rate),
                         "X-Channels": "1",
                         "X-Bit-Depth": "16"
                     }
@@ -488,7 +526,7 @@ async def openai_speech(request: OpenAISpeechRequest):
             else:  # wav
                 # Convert to WAV bytes
                 wav_buffer = io.BytesIO()
-                wav_write(wav_buffer, SAMPLE_RATE, full_audio)
+                wav_write(wav_buffer, output_sample_rate, full_audio)
                 wav_buffer.seek(0)
 
                 return Response(
@@ -503,15 +541,38 @@ async def openai_speech(request: OpenAISpeechRequest):
 
 @app.get("/")
 async def root():
-    """Root endpoint with API info"""
+    """Serve web frontend"""
+    index_file = STATIC_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
     return {
         "name": "Kani TTS API",
         "version": "1.0.0",
         "endpoints": {
             "/v1/audio/speech": "POST - OpenAI-compatible speech generation",
+            "/v1/audio/voices": "GET - List available voices",
             "/health": "GET - Health check"
         }
     }
+
+
+@app.get("/v1/audio/voices")
+async def get_voices():
+    """Get list of available voices"""
+    from config import LANGUAGE_MODELS
+    
+    voices = []
+    for lang_code, lang_config in LANGUAGE_MODELS.items():
+        for voice in lang_config["voices"]:
+            voices.append({
+                "id": voice,
+                "name": voice,
+                "object": "voice",
+                "category": f"{lang_code}_voice",
+                "description": f"{lang_config['description']} - {voice}"
+            })
+    
+    return {"voices": voices}
 
 
 if __name__ == "__main__":

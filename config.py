@@ -19,6 +19,10 @@ AUDIO_TOKENS_START = TOKENIZER_LENGTH + 10
 CODEBOOK_SIZE = 4032
 SAMPLE_RATE = 22050
 
+# Audio upsampling configuration (FlashSR)
+ENABLE_UPSAMPLING = True  # Enable FlashSR audio upsampling
+UPSAMPLED_SAMPLE_RATE = 44100  # Target sample rate for upsampling (can be 44100 or 48000)
+
 # Streaming configuration
 CHUNK_SIZE = 25  # Number of new frames to output per iteration
 LOOKBACK_FRAMES = 15  # Number of frames to include from previous context
