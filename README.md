@@ -8,6 +8,9 @@ A high-performance Text-to-Speech (TTS) system powered by vLLM, providing an Ope
 
 - **Ultra-Fast Inference**: 10x faster than standard HuggingFace transformers using vLLM's optimized engine
 - **OpenAI-Compatible API**: Drop-in replacement for OpenAI's `/v1/audio/speech` endpoint
+- **FlashSR Audio Upsampling**: Ultra-fast audio upsampling from 22kHz to 44kHz/48kHz at 200-400x realtime
+- **Advanced Text Normalization**: Handles numbers, currencies, URLs, emails, phone numbers, and more
+- **Interactive Web UI**: Built-in demo interface for easy testing
 - **Real-Time Streaming**: Server-Sent Events (SSE) support for progressive audio delivery
 - **Long-Form Generation**: Automatic text chunking for generating speech from lengthy inputs
 - **Multi-Speaker Support**: Multiple voice options with consistent quality
@@ -17,11 +20,15 @@ A high-performance Text-to-Speech (TTS) system powered by vLLM, providing an Ope
 ## Architecture
 
 ```
-FastAPI Server (OpenAI-compatible endpoint)
+FastAPI Server (OpenAI-compatible endpoint + Web UI)
+            |
+Text Normalization (numbers, URLs, currencies, etc.)
             |
 VLLM AsyncEngine
             |
 Token Streaming + Audio Codec Decoder
+            |
+FlashSR Upsampler (22kHz → 44kHz/48kHz)
             |
 Output: WAV / PCM / Server-Sent Events
 ```
@@ -30,7 +37,8 @@ The system uses:
 - **TTS Model**: `nineninesix/kani-tts-400m-en` (More models [here](https://huggingface.co/nineninesix/models))
 - **Audio Codec**: `nvidia/nemo-nano-codec-22khz-0.6kbps-12.5fps`
 - **Inference Engine**: vLLM with async streaming and KV cache optimization
-- **Sample Rate**: 22050 Hz, 16-bit, mono
+- **Base Sample Rate**: 22050 Hz, 16-bit, mono
+- **Upsampled Rate**: 44100 Hz or 48000 Hz (configurable)
 
 ## Installation
 
@@ -78,6 +86,16 @@ uv pip install vllm --torch-backend=auto
 uv pip install "transformers==4.57.1"
 ```
 
+7. Install additional dependencies for audio processing and text normalization
+```bash
+uv pip install librosa pydub inflect
+```
+
+Alternatively, you can install all dependencies using the `pyproject.toml`:
+```bash
+uv pip install -e .
+```
+
 Here is the [vLLM documentation](https://docs.vllm.ai/en/stable/getting_started/installation/gpu.html) for custom installation
 
 **Known issues**
@@ -97,6 +115,22 @@ Here is the [vLLM documentation](https://docs.vllm.ai/en/stable/getting_started/
 ```bash
 uv run python server.py
 ```
+
+The server will start on `http://localhost:8000` and automatically download the required models on first run.
+
+### Access the Web UI
+
+Open your browser and navigate to:
+```
+http://localhost:8000
+```
+
+The interactive web interface allows you to:
+- Enter text for speech generation
+- Select different voices
+- Choose output format (WAV/PCM)
+- Enable/disable FlashSR upsampling
+- Play and download generated audio
 
 The server will start on `http://localhost:8000` and automatically download the required models on first run.
 
@@ -204,6 +238,36 @@ Returns server and model status.
 }
 ```
 
+### GET `/v1/audio/voices`
+
+Returns a list of available voices.
+
+```bash
+curl http://localhost:8000/v1/audio/voices
+```
+
+**Response:**
+```json
+{
+  "voices": [
+    {
+      "id": "andrew",
+      "name": "andrew",
+      "object": "voice",
+      "category": "en_voice",
+      "description": "English TTS - andrew"
+    },
+    {
+      "id": "katie",
+      "name": "katie",
+      "object": "voice",
+      "category": "en_voice",
+      "description": "English TTS - katie"
+    }
+  ]
+}
+```
+
 ## Long-Form Generation
 
 For texts estimated to take more than 15 seconds to speak (`LONG_FORM_THRESHOLD_SECONDS` in `config.py`), the system automatically:
@@ -223,16 +287,60 @@ For texts estimated to take more than 15 seconds to speak (`LONG_FORM_THRESHOLD_
 }
 ```
 
+## Advanced Features
+
+### FlashSR Audio Upsampling
+
+KaniTTS-vLLM includes FlashSR audio super-resolution for upsampling from 22kHz to 44kHz or 48kHz at 200-400x realtime speed.
+
+**Benefits:**
+- Higher quality audio output
+- Ultra-fast processing with minimal performance impact
+- Configurable target sample rate
+
+**Configuration in [config.py](config.py):**
+```python
+ENABLE_UPSAMPLING = True              # Enable/disable upsampling
+UPSAMPLED_SAMPLE_RATE = 44100         # Target sample rate (44100 or 48000)
+```
+
+The upsampling is automatically applied to all output formats (WAV, PCM, streaming) when enabled.
+
+### Advanced Text Normalization
+
+Input text is automatically normalized to handle various formats:
+
+- **Numbers**: `123` → "one hundred twenty-three"
+- **Currency**: `$45.99` → "forty-five dollars and ninety-nine cents"
+- **URLs**: `www.example.com` → "www dot example dot com"
+- **Emails**: `user@example.com` → "user at example dot com"
+- **Phone numbers**: `(555) 123-4567` → "five five five, one two three, four five six seven"
+- **Times**: `3:30 PM` → "three thirty PM"
+- **Units**: `100 km` → "one hundred kilometers"
+- **Symbols**: `@`, `#`, `$`, `%`, `&` converted to words
+
+**Example:**
+```python
+Input: "Visit www.example.com for $99.99 or call (555) 123-4567"
+Normalized: "Visit www dot example dot com for ninety-nine dollars and ninety-nine cents or call five five five, one two three, four five six seven"
+```
+
+This ensures natural-sounding speech for all input types without manual preprocessing.
+
 ## Configuration
 
 Key configuration parameters in [config.py](config.py):
 
 ```python
 # Audio Settings
-SAMPLE_RATE = 22050                    # Hz
+SAMPLE_RATE = 22050                    # Base Hz
 CODEBOOK_SIZE = 4032                   # Codes per codebook
 CHUNK_SIZE = 25                        # Frames per streaming chunk
 LOOKBACK_FRAMES = 15                   # Context frames for decoding
+
+# Audio Upsampling (FlashSR)
+ENABLE_UPSAMPLING = True               # Enable FlashSR upsampling
+UPSAMPLED_SAMPLE_RATE = 44100          # Target sample rate (44100 or 48000)
 
 # Generation Parameters
 TEMPERATURE = 0.6
@@ -295,16 +403,22 @@ Expected performance for RTX 5090:
 
 ## Project Structure
 ```
-vllm/
+kanitts-vllm/
 ├── server.py               # FastAPI application and main entry point
-├── server.py               # FastAPI web server
 ├── config.py               # Configuration and constants
+├── pyproject.toml          # Project dependencies
 ├── test_rtf.py             # Performance testing utility
+├── static/                 # Web frontend
+│   └── index.html          # Interactive demo UI
 ├── audio/                  # Audio processing modules
 │   ├── player.py           # Audio codec and playback
-│   └── streaming.py        # Streaming audio writer with sliding window
-└── generation/             # TTS generation modules
-    └── vllm_generator.py   # vLLM engine wrapper and generation
+│   ├── streaming.py        # Streaming audio writer with sliding window
+│   └── upsampler.py        # FlashSR audio upsampler
+├── generation/             # TTS generation modules
+│   ├── vllm_generator.py   # vLLM engine wrapper and generation
+│   └── chunking.py         # Text chunking for long-form generation
+└── utils/                  # Utility modules
+    └── text_processing.py  # Text normalization and sentence splitting
 ```
 
 ## How It Works
@@ -444,6 +558,12 @@ curl -X POST http://localhost:8000/v1/audio/speech \
   -H "Content-Type: application/json" \
   -d '{"input": "Test", "voice": "andrew"}' \
   --output test.wav
+
+# Test voices endpoint
+curl http://localhost:8000/v1/audio/voices
+
+# Test web frontend
+# Open http://localhost:8000 in your browser
 ```
 
 ### Adding New Voices

@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KaniTTS-vLLM - Text-to-Speech Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #555;
+        }
+
+        .feature::before {
+            content: "✓";
+            color: #667eea;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 120px;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #d0d0d0;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 500;
+            display: none;
+        }
+
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            display: block;
+        }
+
+        .status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+            display: block;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #d32f2f;
+            display: block;
+        }
+
+        .audio-player {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .audio-player.show {
+            display: block;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .progress-bar.show {
+            display: block;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 KaniTTS-vLLM</h1>
+        <p class="subtitle">High-Performance Text-to-Speech with OpenAI API</p>
+
+        <div class="features">
+            <div class="feature">Ultra-Fast vLLM</div>
+            <div class="feature">FlashSR Upsampling</div>
+            <div class="feature">Multi-Voice Support</div>
+            <div class="feature">OpenAI Compatible</div>
+        </div>
+
+        <div class="form-group">
+            <label for="text">Text to Speech</label>
+            <textarea 
+                id="text" 
+                placeholder="Enter text to convert to speech... Try something like 'Hello, this is a test of the text to speech system with numbers like 123 and $45.99!'"
+            >Hello, this is a demonstration of KaniTTS-vLLM! This system uses advanced text normalization, so it can handle numbers like 123, currency like $45.99, URLs like www.example.com, and much more.</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="voice">Voice</label>
+            <select id="voice">
+                <option value="andrew">Andrew (Male)</option>
+                <option value="katie">Katie (Female)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="format">Output Format</label>
+            <select id="format">
+                <option value="wav">WAV (Recommended)</option>
+                <option value="pcm">PCM (Raw)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <div class="checkbox-group">
+                <input type="checkbox" id="upsampling" checked>
+                <label for="upsampling" style="margin: 0;">Enable FlashSR Upsampling (22kHz → 44kHz)</label>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button class="btn-primary" id="generateBtn">Generate Speech</button>
+            <button class="btn-secondary" id="downloadBtn" disabled>Download Audio</button>
+        </div>
+
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-fill"></div>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="audio-player" id="audioPlayer">
+            <h3>Generated Audio</h3>
+            <audio controls id="audio"></audio>
+        </div>
+
+        <div class="footer">
+            <p>Powered by <a href="https://github.com/groxaxo/kanitts-vllm" target="_blank">KaniTTS-vLLM</a></p>
+            <p>OpenAI-compatible TTS with FlashSR Upsampling</p>
+        </div>
+    </div>
+
+    <script>
+        const textArea = document.getElementById('text');
+        const voiceSelect = document.getElementById('voice');
+        const formatSelect = document.getElementById('format');
+        const upsamplingCheckbox = document.getElementById('upsampling');
+        const generateBtn = document.getElementById('generateBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusDiv = document.getElementById('status');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const audioElement = document.getElementById('audio');
+        const progressBar = document.getElementById('progressBar');
+
+        let currentAudioBlob = null;
+
+        // Load voices on page load
+        async function loadVoices() {
+            try {
+                const response = await fetch('/v1/audio/voices');
+                const data = await response.json();
+                
+                voiceSelect.innerHTML = '';
+                data.voices.forEach(voice => {
+                    const option = document.createElement('option');
+                    option.value = voice.id;
+                    option.textContent = `${voice.name} (${voice.category})`;
+                    voiceSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading voices:', error);
+            }
+        }
+
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        function hideStatus() {
+            statusDiv.className = 'status';
+        }
+
+        async function generateSpeech() {
+            const text = textArea.value.trim();
+            
+            if (!text) {
+                showStatus('Please enter some text', 'error');
+                return;
+            }
+
+            generateBtn.disabled = true;
+            downloadBtn.disabled = true;
+            audioPlayer.classList.remove('show');
+            progressBar.classList.add('show');
+            showStatus('Generating speech...', 'info');
+
+            try {
+                const response = await fetch('/v1/audio/speech', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        input: text,
+                        voice: voiceSelect.value,
+                        response_format: formatSelect.value,
+                        model: 'tts-1'
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const blob = await response.blob();
+                currentAudioBlob = blob;
+                
+                const audioUrl = URL.createObjectURL(blob);
+                audioElement.src = audioUrl;
+                
+                audioPlayer.classList.add('show');
+                downloadBtn.disabled = false;
+                showStatus('Speech generated successfully!', 'success');
+                
+                // Auto-play the audio
+                audioElement.play();
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+                console.error('Error generating speech:', error);
+            } finally {
+                generateBtn.disabled = false;
+                progressBar.classList.remove('show');
+            }
+        }
+
+        function downloadAudio() {
+            if (!currentAudioBlob) return;
+
+            const url = URL.createObjectURL(currentAudioBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `speech.${formatSelect.value}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showStatus('Download started!', 'success');
+        }
+
+        generateBtn.addEventListener('click', generateSpeech);
+        downloadBtn.addEventListener('click', downloadAudio);
+
+        // Allow Enter key to generate (with Shift+Enter for new line)
+        textArea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                generateSpeech();
+            }
+        });
+
+        // Load voices on page load
+        loadVoices();
+    </script>
+</body>
+</html>
