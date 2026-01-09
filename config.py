@@ -21,7 +21,9 @@ SAMPLE_RATE = 22050
 
 # Audio upsampling configuration (FlashSR)
 ENABLE_UPSAMPLING = True  # Enable FlashSR audio upsampling
-UPSAMPLED_SAMPLE_RATE = 44100  # Target sample rate for upsampling (can be 44100 or 48000)
+UPSAMPLED_SAMPLE_RATE = (
+    44100  # Target sample rate for upsampling (can be 44100 or 48000)
+)
 
 # Streaming configuration
 CHUNK_SIZE = 25  # Number of new frames to output per iteration
@@ -36,8 +38,10 @@ MAX_TOKENS = 1200
 
 # Long-form generation configuration
 LONG_FORM_THRESHOLD_SECONDS = 15.0  # Auto-enable chunking for texts estimated >15s
-LONG_FORM_CHUNK_DURATION = 12.0     # Target duration per chunk (stay within 5-15s training distribution)
-LONG_FORM_SILENCE_DURATION = 0.2    # Silence between chunks in seconds
+LONG_FORM_CHUNK_DURATION = (
+    12.0  # Target duration per chunk (stay within 5-15s training distribution)
+)
+LONG_FORM_SILENCE_DURATION = 0.2  # Silence between chunks in seconds
 
 
 # Multi-Language Configuration
@@ -49,13 +53,13 @@ LANGUAGE_MODELS = {
     "en": {
         "model": "nineninesix/kani-tts-400m-en",
         "voices": ["andrew", "katie"],  # English voices
-        "description": "English TTS"
+        "description": "English TTS",
     },
     "es": {
-        "model": "nineninesix/kani-tts-400m-es",
+        "model": "/home/op/kanitts-finetuned-merged",
         "voices": ["nova", "ballad", "ash"],  # Spanish voices
-        "description": "Spanish TTS"
-    }
+        "description": "Spanish TTS",
+    },
 }
 
 # Default model (will be overridden by language selection in API)

@@ -18,7 +18,7 @@ from nemo.utils.nemo_logging import Logger
 nemo_logger = Logger()
 nemo_logger.remove_stream_handlers()
 
-ES_MODEL = "nineninesix/kani-tts-400m-es"
+ES_MODEL = "/home/op/kanitts-finetuned-merged"
 
 app = FastAPI(title="Kani TTS API - Spanish", version="1.0.0")
 
@@ -52,8 +52,8 @@ async def startup_event():
     generator = VLLMTTSGenerator(
         model_name=ES_MODEL,
         tensor_parallel_size=1,
-        gpu_memory_utilization=0.2,
-        max_model_len=2048,
+        gpu_memory_utilization=0.5,
+        max_model_len=1024,
     )
 
     await generator.initialize_engine()
@@ -123,7 +123,9 @@ async def generate_speech(request: SpeechRequest):
         )
     else:
         wav_buffer = io.BytesIO()
-        wav_write(wav_buffer, 22050, full_audio)
+        # Convert to int16 for compatibility
+        full_audio_int16 = (full_audio * 32767).astype(np.int16)
+        wav_write(wav_buffer, 22050, full_audio_int16)
         wav_buffer.seek(0)
         return Response(content=wav_buffer.read(), media_type="audio/wav")
 

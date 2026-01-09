@@ -9,14 +9,31 @@ from vllm.inputs import TokensPrompt
 from transformers import AutoTokenizer
 
 from config import (
-    MODEL_NAME, START_OF_HUMAN, END_OF_TEXT, END_OF_HUMAN, END_OF_AI, START_OF_AI, END_OF_SPEECH, START_OF_SPEECH,
+    MODEL_NAME,
+    START_OF_HUMAN,
+    END_OF_TEXT,
+    END_OF_HUMAN,
+    END_OF_AI,
+    START_OF_AI,
+    END_OF_SPEECH,
+    START_OF_SPEECH,
     START_OF_TEXT,
-    TEMPERATURE, TOP_P, REPETITION_PENALTY, MAX_TOKENS, SAMPLE_RATE
+    TEMPERATURE,
+    TOP_P,
+    REPETITION_PENALTY,
+    MAX_TOKENS,
+    SAMPLE_RATE,
 )
 
 
 class VLLMTTSGenerator:
-    def __init__(self, model_name=None, tensor_parallel_size=1, gpu_memory_utilization=0.9, max_model_len=2048):
+    def __init__(
+        self,
+        model_name=None,
+        tensor_parallel_size=1,
+        gpu_memory_utilization=0.9,
+        max_model_len=2048,
+    ):
         """Initialize VLLM-based TTS generator with async streaming support
 
         Args:
@@ -38,6 +55,7 @@ class VLLMTTSGenerator:
             enforce_eager=True,  # Disable CUDA graphs to avoid compilation issues
             max_num_seqs=1,  # Single sequence for TTS - enables better CUDA graph optimization
             dtype="bfloat16",  # BF16 for faster inference on RTX 5090
+            enable_prefix_caching=False,  # Requirements for LFM2 architecture
         )
 
         # Create async engine
@@ -66,13 +84,17 @@ class VLLMTTSGenerator:
         """Build custom input_ids with special tokens"""
         # FIX: AutoTokenizer adds BOS by default (ID 1). We add it manually later, so disable it here
         # to prevent double BOS (which causes hallucinations/gibberish).
-        input_ids = self.tokenizer(prompt, add_special_tokens=False, return_tensors="pt").input_ids
+        input_ids = self.tokenizer(
+            prompt, add_special_tokens=False, return_tensors="pt"
+        ).input_ids
 
         # Add special tokens: [START_OF_TEXT] + input_ids + [END_OF_TEXT] + [START_OF_SPEECH]
         start_token = torch.tensor([[START_OF_TEXT]], dtype=torch.int64)
         end_token = torch.tensor([[END_OF_TEXT]], dtype=torch.int64)
         start_speech_token = torch.tensor([[START_OF_SPEECH]], dtype=torch.int64)
-        modified_input_ids = torch.cat([start_token, input_ids, end_token, start_speech_token], dim=1)
+        modified_input_ids = torch.cat(
+            [start_token, input_ids, end_token, start_speech_token], dim=1
+        )
 
         # Convert to list for VLLM
         return modified_input_ids[0].tolist()
@@ -119,9 +141,7 @@ class VLLMTTSGenerator:
 
         # Add request to engine with TokensPrompt
         results_generator = self.engine.generate(
-            {"prompt_token_ids": input_ids},
-            sampling_params,
-            request_id=request_id
+            {"prompt_token_ids": input_ids}, sampling_params, request_id=request_id
         )
 
         # FIX: The prompt ends with START_OF_SPEECH, so the model continues from there.
@@ -151,7 +171,7 @@ class VLLMTTSGenerator:
                         inside_speech = False
                     elif inside_speech:
                         audio_token_count += 1
-            
+
             # Check for silence stop signal
             if audio_writer.stop_signal:
                 print(f"[VLLM] processing stopped due to silence detection.")
@@ -177,8 +197,12 @@ class VLLMTTSGenerator:
         generated_tokens = len(all_token_ids)
         total_tokens = prompt_tokens + generated_tokens
 
-        print(f"\n[VLLM] Generation complete. Prompt tokens: {prompt_tokens}, Generated tokens: {generated_tokens}, Total: {total_tokens}")
-        print(f"       Audio tokens: {audio_token_count}, Frames: {num_frames}, Audio duration: {audio_duration:.2f}s")
+        print(
+            f"\n[VLLM] Generation complete. Prompt tokens: {prompt_tokens}, Generated tokens: {generated_tokens}, Total: {total_tokens}"
+        )
+        print(
+            f"       Audio tokens: {audio_token_count}, Frames: {num_frames}, Audio duration: {audio_duration:.2f}s"
+        )
         print(f"       Generation time: {generation_time:.2f}s, RTF: {rtf:.3f}")
 
         # DEBUG: Print first/last tokens
@@ -189,12 +213,12 @@ class VLLMTTSGenerator:
         # OPTIMIZATION: Skip text decoding - it's slow and not needed for TTS
 
         return {
-            'all_token_ids': all_token_ids,
-            'generation_time': generation_time,
-            'audio_duration': audio_duration,
-            'rtf': rtf,
-            'point_1': point_1,
-            'point_2': point_2
+            "all_token_ids": all_token_ids,
+            "generation_time": generation_time,
+            "audio_duration": audio_duration,
+            "rtf": rtf,
+            "point_1": point_1,
+            "point_2": point_2,
         }
 
     def generate(self, prompt, audio_writer, max_tokens=MAX_TOKENS):
@@ -245,8 +269,15 @@ class VLLMTTSGenerator:
 
             return result
 
-    async def generate_long_form_async(self, text, voice, player, max_chunk_duration=12.0,
-                                       silence_duration=0.2, max_tokens=MAX_TOKENS):
+    async def generate_long_form_async(
+        self,
+        text,
+        voice,
+        player,
+        max_chunk_duration=12.0,
+        silence_duration=0.2,
+        max_tokens=MAX_TOKENS,
+    ):
         """Generate speech for long text by splitting into chunks with voice consistency
 
         This method handles texts longer than the model's training distribution (5-15s)
@@ -272,7 +303,9 @@ class VLLMTTSGenerator:
 
         # Estimate if text needs chunking
         estimated_duration = estimate_duration(text)
-        print(f"\n[Long-form] Estimated duration: {estimated_duration:.1f}s for text length: {len(text)} chars")
+        print(
+            f"\n[Long-form] Estimated duration: {estimated_duration:.1f}s for text length: {len(text)} chars"
+        )
 
         # Split into chunks
         chunks = split_into_sentences(text, max_duration_seconds=max_chunk_duration)
@@ -287,7 +320,9 @@ class VLLMTTSGenerator:
         total_generation_time = 0
 
         for i, chunk in enumerate(chunks):
-            print(f"\n[Long-form] Generating chunk {i+1}/{len(chunks)}: '{chunk[:50]}...'")
+            print(
+                f"\n[Long-form] Generating chunk {i + 1}/{len(chunks)}: '{chunk[:50]}...'"
+            )
 
             # Add voice prefix for consistency
             prompt = f"{voice}: {chunk}"
@@ -296,29 +331,33 @@ class VLLMTTSGenerator:
             audio_writer = StreamingAudioWriter(
                 player,
                 output_file=None,  # Don't write to file
-                chunk_size=25,     # Use default chunk size
-                lookback_frames=15  # Use default lookback
+                chunk_size=25,  # Use default chunk size
+                lookback_frames=15,  # Use default lookback
             )
             audio_writer.start()
 
             # Generate this chunk
-            result = await self._generate_async(prompt, audio_writer, max_tokens=max_tokens)
+            result = await self._generate_async(
+                prompt, audio_writer, max_tokens=max_tokens
+            )
 
             # Finalize and get audio
             audio = audio_writer.finalize()
 
             if audio is not None and len(audio) > 0:
                 audio_segments.append(audio)
-                chunks_info.append({
-                    'chunk_index': i,
-                    'text': chunk,
-                    'duration': result['audio_duration'],
-                    'generation_time': result['generation_time'],
-                    'rtf': result['rtf']
-                })
-                total_generation_time += result['generation_time']
+                chunks_info.append(
+                    {
+                        "chunk_index": i,
+                        "text": chunk,
+                        "duration": result["audio_duration"],
+                        "generation_time": result["generation_time"],
+                        "rtf": result["rtf"],
+                    }
+                )
+                total_generation_time += result["generation_time"]
             else:
-                print(f"[Long-form] Warning: No audio generated for chunk {i+1}")
+                print(f"[Long-form] Warning: No audio generated for chunk {i + 1}")
 
         # Concatenate audio segments with silence
         if len(audio_segments) == 0:
@@ -328,8 +367,7 @@ class VLLMTTSGenerator:
             final_audio = audio_segments[0]
         else:
             final_audio = self._concatenate_with_silence(
-                audio_segments,
-                silence_duration=silence_duration
+                audio_segments, silence_duration=silence_duration
             )
 
         total_duration = len(final_audio) / SAMPLE_RATE
@@ -341,11 +379,11 @@ class VLLMTTSGenerator:
         print(f"  Overall RTF: {total_generation_time / total_duration:.3f}")
 
         return {
-            'audio': final_audio,
-            'chunks_info': chunks_info,
-            'total_duration': total_duration,
-            'total_generation_time': total_generation_time,
-            'num_chunks': len(chunks)
+            "audio": final_audio,
+            "chunks_info": chunks_info,
+            "total_duration": total_duration,
+            "total_generation_time": total_generation_time,
+            "num_chunks": len(chunks),
         }
 
     def _concatenate_with_silence(self, audio_segments, silence_duration=0.2):
